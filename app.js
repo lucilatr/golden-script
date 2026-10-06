@@ -117,6 +117,15 @@
           transition: "Normal / Demonic transition hacia el próximo momento de la canción.",
           storyBeat: "Cierre del arco de introducción: queda establecida la doble realidad.",
         }),
+        // ---- Estructura del resto de la canción (tiempos aproximados, ajustar escuchando) ----
+        mk("scene-007", "00:30", "00:45", { musicalCue: "[VERSE 1 · cont.]", narrativeStage: "desire_insecurity", location: "" }),
+        mk("scene-008", "00:45", "01:00", { musicalCue: "[PRE-CHORUS 1]", narrativeStage: "desire_insecurity", location: "" }),
+        mk("scene-009", "01:00", "01:25", { musicalCue: "[CHORUS 1]", narrativeStage: "transformation", location: "" }),
+        mk("scene-010", "01:25", "01:45", { musicalCue: "[VERSE 2]", narrativeStage: "transformation", location: "" }),
+        mk("scene-011", "01:45", "02:00", { musicalCue: "[PRE-CHORUS 2]", narrativeStage: "transformation", location: "" }),
+        mk("scene-012", "02:00", "02:25", { musicalCue: "[CHORUS 2]", narrativeStage: "golden", location: "" }),
+        mk("scene-013", "02:25", "02:55", { musicalCue: "[BRIDGE]", narrativeStage: "golden", location: "" }),
+        mk("scene-014", "02:55", "03:14", { musicalCue: "[FINAL CHORUS / OUTRO]", narrativeStage: "golden", location: "" }),
       ],
     };
   }
