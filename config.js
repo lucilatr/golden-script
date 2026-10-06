@@ -9,7 +9,7 @@
    (los cambios se guardan solo en tu navegador).
    ============================================================ */
 window.GOLDEN_CONFIG = {
-  supabaseUrl: "",        // ej: "https://abcdxyz.supabase.co"
-  supabaseAnonKey: "",    // la "anon public" key
+  supabaseUrl: "https://aibhrnqyrqosjlqmpwvx.supabase.co",
+  supabaseAnonKey: "sb_publishable_LhBtq_bfZrAp728AfXDxQQ_scA2tuVW",
   docId: "golden",        // id del documento (permite tener varios)
 };
