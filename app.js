@@ -123,7 +123,7 @@
 
   /* ---------------- State ---------------- */
   let data = { meta: seed().meta, segments: [] };
-  const ui = { openId: null, colorBy: "gameplayMode", showDetails: false,
+  const ui = { openId: null, colorBy: "gameplayMode", showDetails: false, drawerMax: false,
     filters: { gameplayMode: "", narrativeStage: "", status: "", location: "" } };
 
   /* ============================================================
@@ -483,14 +483,27 @@
     const s = data.segments.find((x) => x.id === ui.openId);
     if (!s) { d.innerHTML = ""; return; }
     d.style.setProperty("--stage-color", stageColor(s.narrativeStage));
+    d.classList.toggle("max", ui.drawerMax);
     d.innerHTML = "";
 
     const head = h("div", { class: "drawer__head" });
-    head.innerHTML = `<span class="tc">${esc(s.startTime)} → ${esc(s.endTime)}</span><button class="close" title="Cerrar">×</button>`;
+    head.innerHTML = `<span class="tc">${esc(s.startTime)} → ${esc(s.endTime)}</span>
+      <div class="dh-actions">
+        <button class="expand" title="${ui.drawerMax ? "Achicar" : "Pantalla completa"}">${ui.drawerMax ? "⤡" : "⤢"}</button>
+        <button class="close" title="Cerrar">×</button>
+      </div>`;
     head.querySelector(".close").addEventListener("click", closeDrawer);
+    head.querySelector(".expand").addEventListener("click", (e) => {
+      ui.drawerMax = !ui.drawerMax;
+      d.classList.toggle("max", ui.drawerMax);
+      e.target.textContent = ui.drawerMax ? "⤡" : "⤢";
+      e.target.title = ui.drawerMax ? "Achicar" : "Pantalla completa";
+    });
     d.appendChild(head);
 
     const body = h("div", { class: "drawer__body" });
+    const colMain = h("div", { class: "dcol dcol-main" });
+    const colBeats = h("div", { class: "dcol dcol-beats" });
 
     // Timecode
     const tc = h("div", { class: "fg" });
@@ -501,30 +514,30 @@
         <input type="text" data-f="endTime" value="${esc(s.endTime)}" data-tc="1">
         <span class="dur" data-dur>${dur(s)}s</span>
       </div>`;
-    body.appendChild(tc);
+    colMain.appendChild(tc);
 
     // Section + lyric
     const row1 = h("div", { class: "fg-row" });
     row1.appendChild(fgInput(s, "musicalCue", "Sección / cue", "[VERSE 1]"));
     row1.appendChild(fgInput(s, "lyric", "Lyric (pegar a mano)", "[LYRIC TO ADD]"));
-    body.appendChild(wrapFg(row1));
+    colMain.appendChild(wrapFg(row1));
 
     // Gameplay
-    body.appendChild(gpField(s));
+    colMain.appendChild(gpField(s));
     // World
-    body.appendChild(wsField(s));
+    colMain.appendChild(wsField(s));
 
     // Stage + status
     const row2 = h("div", { class: "fg-row" });
     row2.appendChild(fgSelect(s, "narrativeStage", "Etapa narrativa", STAGES));
     row2.appendChild(fgSelect(s, "status", "Estado", STATUS));
-    body.appendChild(wrapFg(row2));
+    colMain.appendChild(wrapFg(row2));
 
     // Qué vemos (acción en pantalla)
-    body.appendChild(fgText(s, "narrativeAction", "Qué vemos en pantalla (acción de Rumi)"));
+    colMain.appendChild(fgText(s, "narrativeAction", "Qué vemos en pantalla (acción de Rumi)"));
 
-    // Momentos jugables (tap → acción, con resultado acierto/fallo)
-    body.appendChild(beatsField(s));
+    // Momentos jugables → columna derecha (más espacio en pantalla completa)
+    colBeats.appendChild(beatsField(s));
 
     // Details toggle
     const toggle = h("button", { class: "details-toggle" + (ui.showDetails ? " open" : "") },
@@ -548,9 +561,11 @@
     details.appendChild(fgText(s, "transition", "Transición (entrada/salida)"));
     details.appendChild(fgText(s, "storyBeat", "Story beat (★ momento clave)"));
     details.appendChild(fgText(s, "productionNotes", "Notas de producción"));
-    body.appendChild(toggle);
-    body.appendChild(details);
+    colMain.appendChild(toggle);
+    colMain.appendChild(details);
 
+    body.appendChild(colMain);
+    body.appendChild(colBeats);
     d.appendChild(body);
 
     // actions
