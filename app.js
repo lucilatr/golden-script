@@ -34,6 +34,17 @@
   const DOC_STATUS = ["Development", "Review", "Approved"];
   const DOC_STATUS_COLOR = { Development: "#5b8bb5", Review: "#b5479b", Approved: "#5a8f7b" };
 
+  // Tipo de sección — se marca A MANO (vacío por defecto)
+  const SECTIONS = [
+    { id: "intro", label: "Intro" },
+    { id: "estrofa", label: "Estrofa" },
+    { id: "pre", label: "Pre-estribillo" },
+    { id: "estribillo", label: "Estribillo" },
+    { id: "puente", label: "Puente" },
+    { id: "outro", label: "Outro" },
+  ];
+  const SEC_COLOR = { intro: "#737a8f", estrofa: "#4f6ba8", pre: "#5b8bb5", estribillo: "#d9a441", puente: "#b5479b", outro: "#5a8f7b" };
+
   const labelOf = (list, id) => (list.find((x) => x.id === id) || {}).label || "";
   const stageColor = (id) => (STAGES.find((x) => x.id === id) || {}).color || "var(--line-2)";
   const gpColor = (id) => (GP.find((x) => x.id === id) || {}).color || "var(--line-2)";
@@ -62,6 +73,7 @@
       location: "Seoul Streets", timeOfDay: "night", narrativeAction: "", characterAction: "",
       camera: "", gameplayMode: "frontal", playerAction: "", environmentInteraction: "",
       worldState: "normal", visualFX: "", transition: "", productionNotes: "", storyBeat: "", status: "idea",
+      sectionType: "",
     };
     const mk = (id, a, b, over) => {
       const s = Object.assign({ id, startTime: a, endTime: b }, base, over);
@@ -227,6 +239,7 @@
     if (!s) return s;
     if (s.gameplayMode === "cinematic") s.gameplayMode = "frontal";
     if (!Array.isArray(s.beats)) s.beats = [];
+    if (s.sectionType == null) s.sectionType = "";
     return s;
   }
   function normalizeAll() { data.segments.forEach(normalizeSeg); }
@@ -342,7 +355,7 @@
     const head = h("div", { class: "hero__head" });
     head.appendChild(h("span", { class: "seglabel" }, "Timeline — click en un bloque para editar"));
     const tgl = h("div", { class: "pill-toggle" });
-    [["gameplayMode", "Gameplay"], ["narrativeStage", "Etapa"], ["worldState", "Mundo"], ["location", "Locación"]].forEach(([id, lb]) => {
+    [["gameplayMode", "Gameplay"], ["sectionType", "Sección"], ["narrativeStage", "Etapa"], ["worldState", "Mundo"], ["location", "Locación"]].forEach(([id, lb]) => {
       const b = h("button", { class: ui.colorBy === id ? "active" : "" }, lb);
       b.addEventListener("click", () => { ui.colorBy = id; renderMain(); });
       tgl.appendChild(b);
@@ -355,6 +368,7 @@
     const colorFor = (s) => {
       const by = ui.colorBy;
       if (by === "gameplayMode") return gpColor(s.gameplayMode);
+      if (by === "sectionType") return SEC_COLOR[s.sectionType] || "var(--line-2)";
       if (by === "narrativeStage") return stageColor(s.narrativeStage);
       if (by === "worldState") return WS_COLOR[s.worldState] || "var(--line-2)";
       const k = s.location || "—"; if (!(k in palette)) { palette[k] = pcols[pi % pcols.length]; pi++; } return palette[k];
@@ -362,6 +376,7 @@
     const labFor = (s) => {
       const by = ui.colorBy;
       if (by === "gameplayMode") return labelOf(GP, s.gameplayMode);
+      if (by === "sectionType") return labelOf(SECTIONS, s.sectionType) || "—";
       if (by === "narrativeStage") return (STAGES.find((x) => x.id === s.narrativeStage) || {}).short || "";
       if (by === "worldState") return labelOf(WS, s.worldState);
       return s.location || "—";
@@ -374,7 +389,11 @@
         style: `left:${left}%;width:${w}%;background:${colorFor(s)}`,
         title: `${s.startTime}–${s.endTime}  ${labFor(s)}`, "data-jump": s.id,
       });
-      if (w > 3.2) block.appendChild(h("span", { class: "lab" }, s.musicalCue || labFor(s)));
+      if (w > 3.2) {
+        const lr = (s.lyric || "").trim();
+        const lyrReal = lr && lr !== "[LYRIC TO ADD]" && lr.indexOf("[INTRO MUSIC") !== 0;
+        block.appendChild(h("span", { class: "lab" }, lyrReal ? lr.split("\n")[0] : labFor(s)));
+      }
       if ((s.storyBeat || "").trim()) block.appendChild(h("span", { class: "star" }, "★"));
       const stage = h("div", { class: "track__stage", style: `left:${left}%;width:${w}%;background:${stageColor(s.narrativeStage)}` });
       track.appendChild(block); track.appendChild(stage);
@@ -389,6 +408,7 @@
     const legend = h("div", { class: "legend" });
     let items = [];
     if (ui.colorBy === "gameplayMode") items = GP.map((g) => [g.label, g.color]);
+    else if (ui.colorBy === "sectionType") items = SECTIONS.map((g) => [g.label, SEC_COLOR[g.id]]);
     else if (ui.colorBy === "narrativeStage") items = STAGES.map((g) => [g.short, g.color]);
     else if (ui.colorBy === "worldState") items = WS.map((g) => [g.label, WS_COLOR[g.id]]);
     else items = Object.keys(palette).map((k) => [k, palette[k]]);
@@ -460,11 +480,17 @@
 
   function renderRow(s) {
     const row = h("div", { class: "row" + (ui.openId === s.id ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
+    const lraw = (s.lyric || "").trim();
+    const lyrEmpty = (lraw === "" || lraw === "[LYRIC TO ADD]");
+    const secTag = s.sectionType ? `<span class="sec-tag sec-${s.sectionType}">${esc(labelOf(SECTIONS, s.sectionType))}</span>` : "";
     row.innerHTML = `
       <div class="tc">${esc(s.startTime)}<small>${esc(s.endTime)} · ${dur(s)}s</small></div>
-      <div class="cue">${esc(s.musicalCue || "")}</div>
+      <div class="seccol">${secTag}</div>
       <div><span class="gp-tag gp-${s.gameplayMode}">${esc(labelOf(GP, s.gameplayMode))}</span></div>
-      <div class="desc ${s.narrativeAction ? "" : "muted"}">${esc(firstLine(s.narrativeAction) || "Sin descripción")}</div>
+      <div class="lyriccell">
+        <div class="lyr ${lyrEmpty ? "muted" : ""}">${esc(lyrEmpty ? (lraw || "[pegar letra]") : lraw)}</div>
+        ${s.narrativeAction ? `<div class="desc2">${esc(firstLine(s.narrativeAction))}</div>` : ""}
+      </div>
       <div class="right">
         ${(s.beats && s.beats.length) ? `<span class="tap-ind" title="${s.beats.length} momento(s) jugable(s)">⊙${s.beats.length}</span>` : ""}
         ${(s.storyBeat || "").trim() ? '<span class="star-ind" title="Story beat">★</span>' : ""}
@@ -527,11 +553,10 @@
       </div>`;
     colMain.appendChild(tc);
 
-    // Section + lyric
-    const row1 = h("div", { class: "fg-row" });
-    row1.appendChild(fgInput(s, "musicalCue", "Sección / cue", "[VERSE 1]"));
-    row1.appendChild(fgInput(s, "lyric", "Lyric (pegar a mano)", "[LYRIC TO ADD]"));
-    colMain.appendChild(wrapFg(row1));
+    // Tipo de sección (manual) + letra + cue
+    colMain.appendChild(sectionField(s));
+    colMain.appendChild(fgText(s, "lyric", "Lyric — pegá acá la letra de esta sección"));
+    colMain.appendChild(fgInput(s, "musicalCue", "Cue musical (opcional)", "[BEAT DROP]"));
 
     // Gameplay
     colMain.appendChild(gpField(s));
@@ -642,6 +667,19 @@
     });
     d.appendChild(set); return d;
   }
+  function sectionField(s) {
+    const d = h("div", { class: "fg" });
+    d.appendChild(h("label", {}, "Tipo de sección — marcá a mano"));
+    const set = h("div", { class: "ch-set sec-set" });
+    SECTIONS.forEach((sec) => {
+      const sel = s.sectionType === sec.id;
+      const b = h("button", { class: "chbtn sec " + sec.id + (sel ? " sel" : "") }, sec.label);
+      b.addEventListener("click", () => { s.sectionType = sel ? "" : sec.id; persistSegment(s, true); renderMain(); renderDrawer(); });
+      set.appendChild(b);
+    });
+    d.appendChild(set);
+    return d;
+  }
   function beatsField(s) {
     const d = h("div", { class: "fg beats-fg" });
     d.appendChild(h("label", {}, "Momentos jugables — el tap modifica la acción"));
@@ -697,7 +735,7 @@
       musicalCue: "", lyric: "[LYRIC TO ADD]", status: "idea",
       narrativeAction: "", characterAction: "", camera: "", playerAction: "",
       environmentInteraction: "", visualFX: "", transition: "", productionNotes: "", storyBeat: "",
-      beats: [], gameplayMode: "frontal", worldState: "normal",
+      beats: [], sectionType: "", gameplayMode: "frontal", worldState: "normal",
       narrativeStage: last ? last.narrativeStage : "desire_insecurity",
       location: last ? last.location : "", timeOfDay: last ? last.timeOfDay : "night",
     });
