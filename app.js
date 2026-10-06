@@ -132,14 +132,14 @@
           storyBeat: "Cierre del arco de introducción: queda establecida la doble realidad.",
         }),
         // ---- Estructura del resto de la canción (tiempos aproximados, ajustar escuchando) ----
-        mk("scene-007", "00:30", "00:45", { musicalCue: "[VERSE 1 · cont.]", narrativeStage: "desire_insecurity", location: "" }),
-        mk("scene-008", "00:45", "01:00", { musicalCue: "[PRE-CHORUS 1]", narrativeStage: "desire_insecurity", location: "" }),
-        mk("scene-009", "01:00", "01:25", { musicalCue: "[CHORUS 1]", narrativeStage: "transformation", location: "" }),
-        mk("scene-010", "01:25", "01:45", { musicalCue: "[VERSE 2]", narrativeStage: "transformation", location: "" }),
-        mk("scene-011", "01:45", "02:00", { musicalCue: "[PRE-CHORUS 2]", narrativeStage: "transformation", location: "" }),
-        mk("scene-012", "02:00", "02:25", { musicalCue: "[CHORUS 2]", narrativeStage: "golden", location: "" }),
-        mk("scene-013", "02:25", "02:55", { musicalCue: "[BRIDGE]", narrativeStage: "golden", location: "" }),
-        mk("scene-014", "02:55", "03:14", { musicalCue: "[FINAL CHORUS / OUTRO]", narrativeStage: "golden", location: "" }),
+        mk("scene-007", "00:30", "00:45", { musicalCue: "[VERSE 1 · cont.]", narrativeStage: "desire_insecurity", location: "", gameplayMode: "" }),
+        mk("scene-008", "00:45", "01:00", { musicalCue: "[PRE-CHORUS 1]", narrativeStage: "desire_insecurity", location: "", gameplayMode: "" }),
+        mk("scene-009", "01:00", "01:25", { musicalCue: "[CHORUS 1]", narrativeStage: "transformation", location: "", gameplayMode: "" }),
+        mk("scene-010", "01:25", "01:45", { musicalCue: "[VERSE 2]", narrativeStage: "transformation", location: "", gameplayMode: "" }),
+        mk("scene-011", "01:45", "02:00", { musicalCue: "[PRE-CHORUS 2]", narrativeStage: "transformation", location: "", gameplayMode: "" }),
+        mk("scene-012", "02:00", "02:25", { musicalCue: "[CHORUS 2]", narrativeStage: "golden", location: "", gameplayMode: "" }),
+        mk("scene-013", "02:25", "02:55", { musicalCue: "[BRIDGE]", narrativeStage: "golden", location: "", gameplayMode: "" }),
+        mk("scene-014", "02:55", "03:14", { musicalCue: "[FINAL CHORUS / OUTRO]", narrativeStage: "golden", location: "", gameplayMode: "" }),
       ],
     };
   }
@@ -243,6 +243,20 @@
     return s;
   }
   function normalizeAll() { data.segments.forEach(normalizeSeg); }
+
+  // Migración única: los bloques de estructura se habían creado con modo "frontal"
+  // por defecto. Los que no tienen ninguna acción cargada quedan sin modo para que
+  // se pueda elegir el gameplay a mano.
+  function migrateGpOnce() {
+    if (data.meta && data.meta.gpMigrated) return;
+    data.segments.forEach((s) => {
+      const vacio = !(s.narrativeAction || "").trim() && !(s.characterAction || "").trim()
+        && !(s.playerAction || "").trim() && !(s.camera || "").trim() && !((s.beats || []).length);
+      if (s.gameplayMode === "frontal" && vacio) s.gameplayMode = "";
+    });
+    data.meta.gpMigrated = true;
+    persistBulk();
+  }
 
   /* ---------------- Derived ---------------- */
   const sorted = () => data.segments.slice().sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
@@ -470,6 +484,9 @@
     const old = host.querySelector(".list"); if (old) old.remove();
     const list = h("div", { class: "list" });
     const vis = sorted().filter(passes);
+    const head = h("div", { class: "row row-head" });
+    head.innerHTML = `<div>Tiempo</div><div>Letra</div><div>Gameplay</div><div>Momento</div><div>Escenario</div><div>Acción</div><div></div>`;
+    list.appendChild(head);
     if (!vis.length) list.appendChild(h("div", { class: "empty" }, "No hay bloques que coincidan con los filtros."));
     vis.forEach((s) => list.appendChild(renderRow(s)));
     const add = h("button", { class: "add-row" }, "+ Agregar bloque");
@@ -481,16 +498,22 @@
   function renderRow(s) {
     const row = h("div", { class: "row" + (ui.openId === s.id ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
     const lraw = (s.lyric || "").trim();
-    const lyrEmpty = (lraw === "" || lraw === "[LYRIC TO ADD]");
-    const secTag = s.sectionType ? `<span class="sec-tag sec-${s.sectionType}">${esc(labelOf(SECTIONS, s.sectionType))}</span>` : "";
+    const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
+    const lyrHtml = instrumental
+      ? '<div class="lyr instrumental">♪ Instrumental · sin letra</div>'
+      : `<div class="lyr">${esc(lraw)}</div>`;
+    const gpTag = s.gameplayMode
+      ? `<span class="gp-tag gp-${s.gameplayMode}">${esc(labelOf(GP, s.gameplayMode))}</span>`
+      : `<span class="gp-tag gp-none">sin definir</span>`;
+    const tod = s.timeOfDay ? labelOf(TOD, s.timeOfDay) : "";
+    const loc = (s.location || "").trim();
     row.innerHTML = `
       <div class="tc">${esc(s.startTime)}<small>${esc(s.endTime)} · ${dur(s)}s</small></div>
-      <div class="seccol">${secTag}</div>
-      <div><span class="gp-tag gp-${s.gameplayMode}">${esc(labelOf(GP, s.gameplayMode))}</span></div>
-      <div class="lyriccell">
-        <div class="lyr ${lyrEmpty ? "muted" : ""}">${esc(lyrEmpty ? (lraw || "[pegar letra]") : lraw)}</div>
-        ${s.narrativeAction ? `<div class="desc2">${esc(firstLine(s.narrativeAction))}</div>` : ""}
-      </div>
+      <div class="lyriccell">${lyrHtml}</div>
+      <div class="col-gp">${gpTag}</div>
+      <div class="col-tod">${tod ? esc(tod) : '<span class="muted">—</span>'}</div>
+      <div class="col-loc">${loc ? esc(loc) : '<span class="muted">—</span>'}</div>
+      <div class="actioncell">${s.narrativeAction ? esc(firstLine(s.narrativeAction)) : '<span class="muted">—</span>'}</div>
       <div class="right">
         ${(s.beats && s.beats.length) ? `<span class="tap-ind" title="${s.beats.length} momento(s) jugable(s)">⊙${s.beats.length}</span>` : ""}
         ${(s.storyBeat || "").trim() ? '<span class="star-ind" title="Story beat">★</span>' : ""}
@@ -555,11 +578,18 @@
 
     // Tipo de sección (manual) + letra + cue
     colMain.appendChild(sectionField(s));
-    colMain.appendChild(fgText(s, "lyric", "Lyric — pegá acá la letra de esta sección"));
+    colMain.appendChild(fgText(s, "lyric", "Lyric — pegá la letra. Si es solo música, dejalo vacío (se marca como instrumental)"));
     colMain.appendChild(fgInput(s, "musicalCue", "Cue musical (opcional)", "[BEAT DROP]"));
 
     // Gameplay
     colMain.appendChild(gpField(s));
+
+    // Escenario + momento del día (columnas principales)
+    const rowCtx = h("div", { class: "fg-row" });
+    rowCtx.appendChild(fgInput(s, "location", "Escenario / locación", "Seoul Streets"));
+    rowCtx.appendChild(fgSelect(s, "timeOfDay", "Momento del día", TOD));
+    colMain.appendChild(wrapFg(rowCtx));
+
     // World
     colMain.appendChild(wsField(s));
 
@@ -570,7 +600,7 @@
     colMain.appendChild(wrapFg(row2));
 
     // Qué vemos (acción en pantalla)
-    colMain.appendChild(fgText(s, "narrativeAction", "Qué vemos en pantalla (acción de Rumi)"));
+    colMain.appendChild(fgText(s, "narrativeAction", "Acción — qué sucede en pantalla (no repitas escenario ni momento del día, ya están arriba)"));
 
     // Momentos jugables → columna derecha (más espacio en pantalla completa)
     colBeats.appendChild(beatsField(s));
@@ -585,10 +615,6 @@
       toggle.classList.toggle("open", ui.showDetails);
       toggle.querySelector("span:last-child").textContent = ui.showDetails ? "Menos detalles" : "Más detalles";
     });
-    const rowLoc = h("div", { class: "fg-row" });
-    rowLoc.appendChild(fgInput(s, "location", "Locación", "Seoul Streets"));
-    rowLoc.appendChild(fgSelect(s, "timeOfDay", "Momento del día", TOD));
-    details.appendChild(wrapFg(rowLoc));
     details.appendChild(fgText(s, "characterAction", "Character action (qué hace físicamente)"));
     details.appendChild(fgText(s, "camera", "Cámara / puesta"));
     details.appendChild(fgText(s, "playerAction", "Player action (qué hace el jugador)"));
@@ -647,11 +673,12 @@
   }
   function gpField(s) {
     const d = h("div", { class: "fg" });
-    d.appendChild(h("label", {}, "Gameplay mode"));
+    d.appendChild(h("label", {}, "Gameplay mode — elegí el modo de juego"));
     const set = h("div", { class: "ch-set" });
     GP.forEach((g) => {
-      const b = h("button", { class: "chbtn " + g.id + (s.gameplayMode === g.id ? " sel" : "") }, g.label);
-      b.addEventListener("click", () => { s.gameplayMode = g.id; persistSegment(s, true); renderMain(); renderDrawer(); });
+      const sel = s.gameplayMode === g.id;
+      const b = h("button", { class: "chbtn " + g.id + (sel ? " sel" : "") }, g.label);
+      b.addEventListener("click", () => { s.gameplayMode = sel ? "" : g.id; persistSegment(s, true); renderMain(); renderDrawer(); });
       set.appendChild(b);
     });
     d.appendChild(set); return d;
@@ -735,7 +762,7 @@
       musicalCue: "", lyric: "[LYRIC TO ADD]", status: "idea",
       narrativeAction: "", characterAction: "", camera: "", playerAction: "",
       environmentInteraction: "", visualFX: "", transition: "", productionNotes: "", storyBeat: "",
-      beats: [], sectionType: "", gameplayMode: "frontal", worldState: "normal",
+      beats: [], sectionType: "", gameplayMode: "", worldState: "normal",
       narrativeStage: last ? last.narrativeStage : "desire_insecurity",
       location: last ? last.location : "", timeOfDay: last ? last.timeOfDay : "night",
     });
@@ -829,6 +856,7 @@
       loadLocal();
     }
     normalizeAll();
+    migrateGpOnce();
     renderAll();
   }
   function loadLocal() {
