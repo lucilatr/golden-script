@@ -72,7 +72,7 @@
       meta: { title: "GOLDEN", songDuration: "03:30", status: "Development", version: "v01", lastUpdated: new Date().toISOString() },
       segments: [
         mk("scene-001", "00:00", "00:05", {
-          musicalCue: "[INTRO]", status: "in_development",
+          musicalCue: "[INTRO]", lyric: "[INTRO MUSIC · sin letra]", status: "in_development",
           narrativeAction: "Presentamos a Rumi caminando por las calles de Seúl durante la noche. El inicio tiene que establecer inmediatamente una sensación de introspección e inseguridad. Queremos captar la atención del jugador durante los primeros cinco segundos.",
           characterAction: "Rumi comienza caminando hacia cámara. Su movimiento y coreografía transmiten el estado emocional sin depender de expresiones faciales complejas.",
           camera: "Frontal tracking shot. La cámara retrocede mientras Rumi avanza.",
@@ -87,12 +87,14 @@
           }],
         }),
         mk("scene-002", "00:05", "00:10", {
+          musicalCue: "[INTRO]", lyric: "[INTRO MUSIC · sin letra]",
           narrativeAction: "Rumi continúa avanzando por Seúl. La coreografía empieza a integrarse con el ritmo.",
           characterAction: "Camina y baila mientras avanza hacia cámara.", camera: "Frontal tracking shot.",
           playerAction: "Taps sincronizados con las notas.",
           environmentInteraction: "Algunos taps afectan elementos del escenario en lugar de controlar directamente los movimientos de Rumi. Por ejemplo: carteles urbanos pueden reaccionar visualmente al input.",
         }),
         mk("scene-003", "00:10", "00:15", {
+          musicalCue: "[INTRO]", lyric: "[INTRO MUSIC · sin letra]",
           narrativeAction: "La caminata continúa pero aparece por primera vez una interrupción clara de la realidad.",
           camera: "Mantener la misma composición para que el cambio del mundo sea claramente perceptible.",
           playerAction: "El rhythm gameplay continúa sin interrupción.", worldState: "transition",
