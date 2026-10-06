@@ -283,6 +283,40 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .drawer__actions .sp { flex: 1; }
 .drawer__actions .del:hover { border-color: #b5475a; color: #e59bab; }
 
+/* ---------------- Beats (momentos jugables) ---------------- */
+.beats-fg { background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px; }
+.beats-hint { font-size: 11px; color: var(--text-dim); margin: -2px 0 4px; line-height: 1.4; }
+.beatlist { display: flex; flex-direction: column; gap: 9px; margin-top: 6px; }
+.beatcard { position: relative; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--radius-s); padding: 10px 11px; }
+.beatcard .rm {
+  position: absolute; top: 6px; right: 7px; background: none; border: none;
+  color: var(--text-dim); font-size: 16px; cursor: pointer; line-height: 1;
+}
+.beatcard .rm:hover { color: #e59bab; }
+.beatcard .bcue {
+  width: calc(100% - 20px); background: var(--bg-3); border: 1px solid var(--line);
+  border-radius: var(--radius-s); padding: 7px 9px; color: var(--text); font-size: 12.5px;
+}
+.beatcard .bcue:focus { outline: none; border-color: var(--accent); }
+.beatcard .io { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
+.beatcard .io label { font-size: 10px; letter-spacing: .4px; text-transform: uppercase; display: block; margin-bottom: 4px; }
+.beatcard .hit label { color: #7fc9ae; }
+.beatcard .miss label { color: #f3a07f; }
+.beatcard .io textarea {
+  width: 100%; min-height: 50px; background: var(--bg-3); border: 1px solid var(--line);
+  border-radius: var(--radius-s); padding: 7px 9px; color: var(--text); font-size: 12px; line-height: 1.45; resize: vertical;
+}
+.beatcard .hit textarea:focus { outline: none; border-color: #5a8f7b; }
+.beatcard .miss textarea:focus { outline: none; border-color: var(--gp-combat); }
+.beat-add {
+  margin-top: 10px; width: 100%; background: transparent; border: 1px dashed var(--line-2);
+  color: var(--text-2); padding: 9px; border-radius: var(--radius-s); cursor: pointer; font-size: 12px;
+}
+.beat-add:hover { border-color: var(--accent); color: var(--accent-2); }
+
+.tap-ind { font-size: 11px; color: #a7cdee; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line-2); border-radius: 20px; padding: 1px 7px; }
+
 /* ---------------- Toast ---------------- */
 .toast {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);

@@ -21,7 +21,6 @@
     { id: "frontal", label: "Frontal", color: "var(--gp-frontal)" },
     { id: "lateral", label: "Lateral", color: "var(--gp-lateral)" },
     { id: "combat", label: "Combat", color: "var(--gp-combat)" },
-    { id: "cinematic", label: "Cinematic", color: "var(--gp-cinematic)" },
   ];
   const WS = [
     { id: "normal", label: "Normal" }, { id: "demonic", label: "Demonic" },
@@ -64,7 +63,11 @@
       camera: "", gameplayMode: "frontal", playerAction: "", environmentInteraction: "",
       worldState: "normal", visualFX: "", transition: "", productionNotes: "", storyBeat: "", status: "idea",
     };
-    const mk = (id, a, b, over) => Object.assign({ id, startTime: a, endTime: b }, base, over);
+    const mk = (id, a, b, over) => {
+      const s = Object.assign({ id, startTime: a, endTime: b }, base, over);
+      if (!Array.isArray(s.beats)) s.beats = [];
+      return s;
+    };
     return {
       meta: { title: "GOLDEN", songDuration: "03:30", status: "Development", version: "v01", lastUpdated: new Date().toISOString() },
       segments: [
@@ -77,6 +80,11 @@
           visualFX: "Pequeñas señales visuales pueden anticipar que existe algo extraño detrás de la realidad normal.",
           productionNotes: "La introducción tiene que sentirse ligeramente cinemática pero llevar rápidamente al gameplay.",
           storyBeat: "Rumi camina por Seúl de noche. Se establece la introspección e inseguridad.",
+          beats: [{
+            cue: "Nota de salto en el beat fuerte",
+            onHit: "Rumi salta perfecto y sigue bailando sin perder el flow.",
+            onMiss: "Rumi salta pero se tropieza levemente y se recupera, retomando la coreografía.",
+          }],
         }),
         mk("scene-002", "00:05", "00:10", {
           narrativeAction: "Rumi continúa avanzando por Seúl. La coreografía empieza a integrarse con el ritmo.",
@@ -171,7 +179,7 @@
         data.segments = data.segments.filter((s) => s.id !== id);
         if (ui.openId === id) closeDrawer();
       } else {
-        const seg = payload.new && payload.new.data;
+        const seg = normalizeSeg(payload.new && payload.new.data);
         if (!seg) return;
         const i = data.segments.findIndex((s) => s.id === seg.id);
         if (i === -1) data.segments.push(seg); else data.segments[i] = seg;
@@ -202,6 +210,15 @@
   function persistMeta() { touch(); if (Sync.enabled) Sync.pushMeta(); else saveLocal(); refreshUpdated(); }
   function persistDelete(id) { touch(); if (Sync.enabled) { Sync.deleteSegment(id); Sync.pushMeta(); } else saveLocal(); refreshUpdated(); }
   function persistBulk() { touch(); if (Sync.enabled) { data.segments.forEach((s) => Sync.pushSegment(s, true)); Sync.pushMeta(); } else saveLocal(); refreshUpdated(); }
+
+  /* ---------------- Normalize (migrations) ---------------- */
+  function normalizeSeg(s) {
+    if (!s) return s;
+    if (s.gameplayMode === "cinematic") s.gameplayMode = "frontal";
+    if (!Array.isArray(s.beats)) s.beats = [];
+    return s;
+  }
+  function normalizeAll() { data.segments.forEach(normalizeSeg); }
 
   /* ---------------- Derived ---------------- */
   const sorted = () => data.segments.slice().sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
@@ -438,6 +455,7 @@
       <div><span class="gp-tag gp-${s.gameplayMode}">${esc(labelOf(GP, s.gameplayMode))}</span></div>
       <div class="desc ${s.narrativeAction ? "" : "muted"}">${esc(firstLine(s.narrativeAction) || "Sin descripción")}</div>
       <div class="right">
+        ${(s.beats && s.beats.length) ? `<span class="tap-ind" title="${s.beats.length} momento(s) jugable(s)">⊙${s.beats.length}</span>` : ""}
         ${(s.storyBeat || "").trim() ? '<span class="star-ind" title="Story beat">★</span>' : ""}
         <span class="status-dot s-${s.status}" title="${esc(labelOf(STATUS, s.status))}"></span>
       </div>`;
@@ -502,8 +520,11 @@
     row2.appendChild(fgSelect(s, "status", "Estado", STATUS));
     body.appendChild(wrapFg(row2));
 
-    // Qué pasa
-    body.appendChild(fgText(s, "narrativeAction", "Qué pasa (narrativa)"));
+    // Qué vemos (acción en pantalla)
+    body.appendChild(fgText(s, "narrativeAction", "Qué vemos en pantalla (acción de Rumi)"));
+
+    // Momentos jugables (tap → acción, con resultado acierto/fallo)
+    body.appendChild(beatsField(s));
 
     // Details toggle
     const toggle = h("button", { class: "details-toggle" + (ui.showDetails ? " open" : "") },
@@ -595,6 +616,50 @@
     });
     d.appendChild(set); return d;
   }
+  function beatsField(s) {
+    const d = h("div", { class: "fg beats-fg" });
+    d.appendChild(h("label", {}, "Momentos jugables — el tap modifica la acción"));
+    d.appendChild(h("div", { class: "beats-hint" }, "Cada momento: qué nota se tapea y qué pasa según el jugador acierte o falle."));
+    const list = h("div", { class: "beatlist" });
+    (s.beats || []).forEach((b, i) => list.appendChild(beatCard(s, b, i)));
+    d.appendChild(list);
+    const add = h("button", { class: "beat-add" }, "+ Agregar momento jugable");
+    add.addEventListener("click", () => {
+      s.beats = s.beats || [];
+      s.beats.push({ cue: "", onHit: "", onMiss: "" });
+      persistSegment(s, true); renderDrawer(); renderMain();
+    });
+    d.appendChild(add);
+    return d;
+  }
+  function beatCard(s, b, i) {
+    const c = h("div", { class: "beatcard" });
+    const rm = h("button", { class: "rm", title: "Quitar momento" }, "×");
+    rm.addEventListener("click", () => { s.beats.splice(i, 1); persistSegment(s, true); renderDrawer(); renderMain(); });
+    c.appendChild(rm);
+
+    const cue = h("input", { type: "text", class: "bcue", placeholder: "Cue / nota — ej: nota de salto en el beat fuerte" });
+    cue.value = b.cue || "";
+    cue.addEventListener("input", (e) => { b.cue = e.target.value; persistSegment(s); });
+    c.appendChild(cue);
+
+    const io = h("div", { class: "io" });
+    const hit = h("div", { class: "hit" });
+    hit.appendChild(h("label", {}, "Si acertás ✓"));
+    const hitTa = h("textarea", { placeholder: "Salta perfecto y sigue bailando sin perder el flow" });
+    hitTa.value = b.onHit || "";
+    hitTa.addEventListener("input", (e) => { b.onHit = e.target.value; persistSegment(s); });
+    hit.appendChild(hitTa);
+    const miss = h("div", { class: "miss" });
+    miss.appendChild(h("label", {}, "Si fallás ✕"));
+    const missTa = h("textarea", { placeholder: "Salta pero se tropieza y se recupera, retomando la coreografía" });
+    missTa.value = b.onMiss || "";
+    missTa.addEventListener("input", (e) => { b.onMiss = e.target.value; persistSegment(s); });
+    miss.appendChild(missTa);
+    io.appendChild(hit); io.appendChild(miss);
+    c.appendChild(io);
+    return c;
+  }
 
   /* ---------------- CRUD ---------------- */
   function addSegment() {
@@ -606,7 +671,7 @@
       musicalCue: "", lyric: "[LYRIC TO ADD]", status: "idea",
       narrativeAction: "", characterAction: "", camera: "", playerAction: "",
       environmentInteraction: "", visualFX: "", transition: "", productionNotes: "", storyBeat: "",
-      gameplayMode: "frontal", worldState: "normal",
+      beats: [], gameplayMode: "frontal", worldState: "normal",
       narrativeStage: last ? last.narrativeStage : "desire_insecurity",
       location: last ? last.location : "", timeOfDay: last ? last.timeOfDay : "night",
     });
@@ -666,6 +731,7 @@
           const p = JSON.parse(r.result); if (!p.segments) throw 0;
           if (!confirm("Importar reemplaza el documento actual. ¿Seguir?")) return;
           data = p; if (!data.meta) data.meta = seed().meta;
+          normalizeAll();
           ui.openId = null; persistBulk(); renderAll(); toast("Importado");
         } catch (e) { toast("Archivo JSON inválido"); }
       };
@@ -698,6 +764,7 @@
     } else {
       loadLocal();
     }
+    normalizeAll();
     renderAll();
   }
   function loadLocal() {
