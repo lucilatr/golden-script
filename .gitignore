@@ -1,0 +1,13 @@
+# OS / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Backups de export
+golden-script-*.json
+
+# Documentos internos (no publicar)
+IGS1_full.docx
+IGS1_full.md
+KPDH_Escenarios/
