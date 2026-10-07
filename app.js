@@ -578,11 +578,6 @@
       </div>`;
     colMain.appendChild(tc);
 
-    // Tipo de sección (manual) + letra + cue
-    colMain.appendChild(sectionField(s));
-    colMain.appendChild(fgText(s, "lyric", "Lyric — pegá la letra. Si es solo música, dejalo vacío (se marca como instrumental)"));
-    colMain.appendChild(fgInput(s, "musicalCue", "Cue musical (opcional)", "[BEAT DROP]"));
-
     // Storyboard / captura de gameplay (la columna "Acción")
     colMain.appendChild(storyboardField(s));
 
@@ -609,27 +604,6 @@
 
     // Momentos jugables → columna derecha
     colBeats.appendChild(beatsField(s));
-
-    // Details toggle
-    const toggle = h("button", { class: "details-toggle" + (ui.showDetails ? " open" : "") },
-      [h("span", { class: "chev" }, "▶"), h("span", {}, ui.showDetails ? "Menos detalles" : "Más detalles")]);
-    const details = h("div", { class: "details" + (ui.showDetails ? " open" : "") });
-    toggle.addEventListener("click", () => {
-      ui.showDetails = !ui.showDetails;
-      details.classList.toggle("open", ui.showDetails);
-      toggle.classList.toggle("open", ui.showDetails);
-      toggle.querySelector("span:last-child").textContent = ui.showDetails ? "Menos detalles" : "Más detalles";
-    });
-    details.appendChild(fgText(s, "characterAction", "Character action (qué hace físicamente)"));
-    details.appendChild(fgText(s, "camera", "Cámara / puesta"));
-    details.appendChild(fgText(s, "playerAction", "Player action (qué hace el jugador)"));
-    details.appendChild(fgText(s, "environmentInteraction", "Interacción con el entorno"));
-    details.appendChild(fgText(s, "visualFX", "Visual / FX"));
-    details.appendChild(fgText(s, "transition", "Transición (entrada/salida)"));
-    details.appendChild(fgText(s, "storyBeat", "Story beat (★ momento clave)"));
-    details.appendChild(fgText(s, "productionNotes", "Notas de producción"));
-    colMain.appendChild(toggle);
-    colMain.appendChild(details);
 
     body.appendChild(colMain);
     body.appendChild(colBeats);
