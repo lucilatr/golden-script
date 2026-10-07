@@ -504,6 +504,26 @@
 
   const isVideo = (u) => /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u || "") || String(u || "").indexOf("data:video") === 0;
 
+  /* ---- Letra con timecode por línea (formato [MM:SS] opcional, estilo LRC) ---- */
+  function parseLyric(lyric) {
+    return String(lyric == null ? "" : lyric).split("\n").map((line) => {
+      const m = /^\s*\[(\d{1,2}):(\d{2})\]\s?(.*)$/.exec(line);
+      return m ? { t: (+m[1]) * 60 + (+m[2]), text: m[3] } : { t: null, text: line };
+    });
+  }
+  function fmtLyric(parsed) {
+    return parsed.map((l) => (l.t == null ? l.text : "[" + fmtTime(l.t) + "] " + l.text)).join("\n");
+  }
+  function stripLrc(lyric) { return parseLyric(lyric).map((l) => l.text).join("\n"); }
+  function lyricSyncCount(lyric) {
+    const p = parseLyric(lyric).filter((l) => l.text.trim());
+    return { synced: p.filter((l) => l.t != null).length, total: p.length };
+  }
+  function isRealLyric(lyric) {
+    const c = stripLrc(lyric).trim();
+    return !!c && c !== "[LYRIC TO ADD]" && c.indexOf("[INTRO MUSIC") !== 0 && !(c.charAt(0) === "[" && c.charAt(c.length - 1) === "]");
+  }
+
   // Limita la reproducción del video a la ventana del bloque [clipStart, clipEnd]
   function applyClipWindow(video, s) {
     const cs = s.clipStart || 0, ce = s.clipEnd || 0;
@@ -531,12 +551,16 @@
   }
 
   function lyrCellHTML(s) {
-    const lraw = (s.lyric || "").trim();
-    const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
+    const clean = stripLrc(s.lyric || "").trim();
+    const instrumental = (clean === "" || clean === "[LYRIC TO ADD]" || clean.indexOf("[INTRO MUSIC") === 0);
     const lyrHtml = instrumental
       ? '<div class="lyr instrumental" title="Doble clic para editar">♪ Instrumental · sin letra</div>'
-      : `<div class="lyr" title="Doble clic para editar">${esc(lraw)}</div>`;
-    return lyrHtml + '<button class="lyr-edit" title="Editar letra acá">✎</button>';
+      : `<div class="lyr" title="Doble clic para editar">${esc(clean)}</div>`;
+    const sc = lyricSyncCount(s.lyric);
+    const badge = (!instrumental && sc.total)
+      ? `<span class="lyr-sync ${sc.synced === sc.total ? "full" : ""}" title="${sc.synced}/${sc.total} líneas con tiempo marcado">⏱ ${sc.synced}/${sc.total}</span>`
+      : "";
+    return lyrHtml + badge + '<button class="lyr-edit" title="Editar letra acá">✎</button>';
   }
   function wireLyricCell(row, s) {
     const cell = row.querySelector(".lyriccell");
@@ -608,13 +632,19 @@
     if (!row) return;
     const lyrEl = row.querySelector(".lyr");
     if (lyrEl) {
-      const lraw = (s.lyric || "").trim();
-      const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
+      const clean = stripLrc(s.lyric || "").trim();
+      const instrumental = (clean === "" || clean === "[LYRIC TO ADD]" || clean.indexOf("[INTRO MUSIC") === 0);
       lyrEl.className = "lyr" + (instrumental ? " instrumental" : "");
-      lyrEl.textContent = instrumental ? "♪ Instrumental · sin letra" : lraw;
+      lyrEl.textContent = instrumental ? "♪ Instrumental · sin letra" : clean;
     }
     const small = row.querySelector(".tc small");
     if (small) small.textContent = s.endTime + " · " + dur(s) + "s";
+  }
+  function refreshLyricCell(s) {
+    const row = document.querySelector(`.rowwrap[data-seg="${s.id}"] > .row`);
+    if (!row) return;
+    const cell = row.querySelector(".lyriccell");
+    if (cell) { cell.innerHTML = lyrCellHTML(s); wireLyricCell(row, s); }
   }
 
   /* ============================================================
@@ -680,7 +710,8 @@
     // Qué vemos (acción en pantalla)
     colMain.appendChild(fgText(s, "narrativeAction", "Acción — qué sucede en pantalla (no repitas escenario ni momento del día, ya están arriba)"));
 
-    // Momentos jugables → columna derecha
+    // Sincronización de letra + momentos jugables → columna derecha
+    colBeats.appendChild(syncField(s));
     colBeats.appendChild(beatsField(s));
 
     body.appendChild(colMain);
@@ -760,6 +791,48 @@
     d.appendChild(ctr);
     return d;
   }
+
+  // Panel de sincronización de letra: marcar el tiempo de cada línea con el video
+  function syncField(s) {
+    const d = h("div", { class: "fg sync-fg" });
+    d.appendChild(h("label", {}, "⏱ Sincronizar letra — tiempo de cada línea"));
+    if (!isRealLyric(s.lyric)) {
+      d.appendChild(h("div", { class: "beats-hint" }, "Este bloque no tiene letra para sincronizar."));
+      return d;
+    }
+    d.appendChild(h("div", { class: "beats-hint" }, "Reproducí el fragmento y, cuando empieza cada frase, tocá ⏱ en esa línea (o escribí el tiempo). El corte usa estos tiempos para repartir la letra exacto."));
+    const parsed = parseLyric(s.lyric);
+    let video = null, songAt = () => null;
+    if (s.storyboard && isVideo(s.storyboard)) {
+      const vbox = h("div", { class: "sbedit sync-video" });
+      video = h("video", { src: s.storyboard, controls: true, preload: "metadata", playsinline: true });
+      vbox.appendChild(video); d.appendChild(vbox);
+      applyClipWindow(video, s);
+      const off = s.clipStart || 0, start = parseTime(s.startTime);
+      songAt = () => start + Math.max(0, (video.currentTime || 0) - off);
+      const ph = h("div", { class: "sync-playhead" }, "⏱ " + s.startTime);
+      video.addEventListener("timeupdate", () => { ph.textContent = "⏱ " + fmtTime(songAt()); });
+      d.appendChild(ph);
+    } else {
+      d.appendChild(h("div", { class: "beats-hint" }, "Sin video en este bloque: podés escribir el tiempo a mano."));
+    }
+    const save = () => { s.lyric = fmtLyric(parsed); persistSegment(s, true); refreshLyricCell(s); refreshTimeline(); };
+    const list = h("div", { class: "sync-list" });
+    parsed.forEach((ln, i) => {
+      if (!ln.text.trim()) return;
+      const r = h("div", { class: "sync-row" });
+      const tin = h("input", { type: "text", class: "sync-t", value: ln.t != null ? fmtTime(ln.t) : "", placeholder: "--:--" });
+      tin.addEventListener("change", () => { const v = tin.value.trim(); parsed[i].t = v ? parseTime(v) : null; save(); });
+      const mark = h("button", { class: "sync-mark", title: "Marcar con el tiempo del video" }, "⏱");
+      if (!video) mark.disabled = true;
+      mark.addEventListener("click", () => { const t = songAt(); if (t == null) return; parsed[i].t = Math.round(t); tin.value = fmtTime(parsed[i].t); save(); });
+      r.appendChild(tin); r.appendChild(mark); r.appendChild(h("span", { class: "sync-txt", title: ln.text }, ln.text));
+      list.appendChild(r);
+    });
+    d.appendChild(list);
+    return d;
+  }
+
   function wrapFg(inner) { const w = h("div", { class: "fg" }); w.appendChild(inner); return w; }
   function fgInput(s, f, label, ph) {
     const d = h("div", { class: "fg" });
@@ -903,16 +976,23 @@
       clone.clipStart = srcCut;   // la 2da mitad arranca el clip en el corte (clone.clipEnd ya viene copiado = fin original)
       s.clipEnd = srcCut;         // la 1ra mitad termina el clip en el corte
     }
-    // dividir la letra en el punto de corte (proporcional al tiempo), sin duplicarla
-    const lraw = s.lyric || "";
-    const lt = lraw.trim();
-    const realLyric = lt && lt !== "[LYRIC TO ADD]" && lraw.indexOf("[INTRO MUSIC") !== 0 && !(lt.charAt(0) === "[" && lt.charAt(lt.length - 1) === "]");
-    if (realLyric) {
-      const lines = lraw.split("\n");
-      let idx = Math.round(((at - a) / (b - a)) * lines.length);
-      idx = Math.max(0, Math.min(lines.length, idx));
-      s.lyric = lines.slice(0, idx).join("\n").replace(/\s+$/, "");
-      clone.lyric = lines.slice(idx).join("\n").replace(/^\s+/, "");
+    // dividir la letra en el punto de corte, sin duplicarla
+    if (isRealLyric(s.lyric)) {
+      const parsed = parseLyric(s.lyric);
+      let idx;
+      if (parsed.some((l) => l.t != null)) {
+        // usar los timecodes por línea: cada frase va al bloque según su tiempo
+        let last = a;
+        const eff = parsed.map((l) => { if (l.t != null) last = l.t; return last; });
+        idx = eff.findIndex((t) => t >= at);
+        if (idx === -1) idx = parsed.length;
+      } else {
+        // sin tiempos: reparto proporcional por cantidad de líneas
+        idx = Math.round(((at - a) / (b - a)) * parsed.length);
+      }
+      idx = Math.max(0, Math.min(parsed.length, idx));
+      s.lyric = fmtLyric(parsed.slice(0, idx)).replace(/\s+$/, "");
+      clone.lyric = fmtLyric(parsed.slice(idx)).replace(/^\s+/, "");
     }
     s.endTime = fmtTime(at);
     data.segments.push(clone);
