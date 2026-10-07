@@ -658,7 +658,7 @@
     act.appendChild(mk("▲ Subir", () => moveSegment(s.id, -1)));
     act.appendChild(mk("▼ Bajar", () => moveSegment(s.id, 1)));
     act.appendChild(mk("⎘ Duplicar", () => duplicateSegment(s.id)));
-    act.appendChild(mk("✂ Dividir bloque", () => splitSegment(s.id)));
+    act.appendChild(mk("✂ Dividir bloque", () => splitSegment(s.id), "split"));
     act.appendChild(h("span", { class: "sp" }));
     act.appendChild(mk("▴ Cerrar", () => closeDrawer()));
     act.appendChild(mk("🗑 Borrar", () => deleteSegment(s.id), "del"));

@@ -252,6 +252,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 .rowedit-actions button:hover { background: var(--bg-hover); color: var(--text); }
 .rowedit-actions .sp { flex: 1; }
+.rowedit-actions .split { background: #e8e8ec; color: #1a1a1a; border-color: #cfcfd6; font-weight: 700; }
+.rowedit-actions .split:hover { background: #fff; color: #000; border-color: #fff; }
 .rowedit-actions .del:hover { border-color: #b5475a; color: #e59bab; }
 
 /* storyboard en el editor */
