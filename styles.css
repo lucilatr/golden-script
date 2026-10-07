@@ -198,7 +198,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 .lyr-edit-ta:focus { outline: none; }
 .row .lyr {
-  color: var(--text); white-space: pre-line; line-height: 1.5;
+  color: var(--text); white-space: pre-line; line-height: 1.5; cursor: text;
 }
 .row .lyr.instrumental { color: var(--text-dim); font-style: italic; font-size: 12px; }
 .row .actioncol { min-width: 0; }

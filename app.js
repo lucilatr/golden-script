@@ -521,7 +521,7 @@
     const start = parseTime(s.startTime);
     const songAt = () => start + Math.max(0, (video.currentTime || 0) - off);
     const bar = h("div", { class: "sb-cutbar" });
-    const cut = h("button", { class: "sb-cut", title: "Dividir el bloque en el punto donde está pausado el video" }, "✂ Cortar acá");
+    const cut = h("button", { class: "sb-cut", title: "Cortar el bloque en el punto donde está pausado el video" }, "✂ Cortar");
     const info = h("span", { class: "sb-cut-time" }, "⏱ " + s.startTime);
     video.addEventListener("timeupdate", () => { info.textContent = "⏱ " + fmtTime(songAt()); });
     cut.addEventListener("click", (e) => { e.stopPropagation(); splitSegmentAt(s.id, songAt()); });
@@ -534,13 +534,18 @@
     const lraw = (s.lyric || "").trim();
     const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
     const lyrHtml = instrumental
-      ? '<div class="lyr instrumental">♪ Instrumental · sin letra</div>'
-      : `<div class="lyr">${esc(lraw)}</div>`;
+      ? '<div class="lyr instrumental" title="Doble clic para editar">♪ Instrumental · sin letra</div>'
+      : `<div class="lyr" title="Doble clic para editar">${esc(lraw)}</div>`;
     return lyrHtml + '<button class="lyr-edit" title="Editar letra acá">✎</button>';
   }
   function wireLyricCell(row, s) {
-    const pencil = row.querySelector(".lyriccell .lyr-edit");
+    const cell = row.querySelector(".lyriccell");
+    if (!cell) return;
+    const pencil = cell.querySelector(".lyr-edit");
     if (pencil) pencil.addEventListener("click", (e) => { e.stopPropagation(); startLyricEdit(row, s); });
+    // click simple en la letra no expande el bloque; doble clic edita ahí mismo
+    cell.addEventListener("click", (e) => { e.stopPropagation(); });
+    cell.addEventListener("dblclick", (e) => { e.stopPropagation(); startLyricEdit(row, s); });
   }
   function startLyricEdit(row, s) {
     const cell = row.querySelector(".lyriccell");
