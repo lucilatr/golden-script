@@ -241,6 +241,7 @@
     if (s.sectionType == null) s.sectionType = "";
     if (s.storyboard == null) s.storyboard = "";
     if (s.clipStart == null) s.clipStart = 0;
+    if (s.clipEnd == null) s.clipEnd = 0;
     return s;
   }
   function normalizeAll() { data.segments.forEach(normalizeSeg); }
@@ -503,10 +504,20 @@
 
   const isVideo = (u) => /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u || "") || String(u || "").indexOf("data:video") === 0;
 
+  // Limita la reproducción del video a la ventana del bloque [clipStart, clipEnd]
+  function applyClipWindow(video, s) {
+    const cs = s.clipStart || 0, ce = s.clipEnd || 0;
+    const seek = () => { try { if (cs) video.currentTime = cs; } catch (e) {} };
+    if (video.readyState >= 1) seek(); else video.addEventListener("loadedmetadata", seek, { once: true });
+    if (ce) {
+      video.addEventListener("timeupdate", () => { if (video.currentTime >= ce) video.pause(); });
+      video.addEventListener("play", () => { if (video.currentTime >= ce - 0.05 || video.currentTime < cs) { try { video.currentTime = cs; } catch (e) {} } });
+    }
+  }
+
   // Barra tipo Premiere: reproducir el clip, pausar y cortar el bloque en el playhead
   function attachCutBar(host, video, s) {
     const off = s.clipStart || 0;
-    if (off) video.addEventListener("loadedmetadata", () => { try { video.currentTime = off; } catch (e) {} });
     const start = parseTime(s.startTime);
     const songAt = () => start + Math.max(0, (video.currentTime || 0) - off);
     const bar = h("div", { class: "sb-cutbar" });
@@ -582,7 +593,7 @@
     const vbox = row.querySelector(".sbframe.video");
     if (vbox) vbox.addEventListener("click", (e) => e.stopPropagation());
     const cvid = row.querySelector(".sbframe.video video");
-    if (cvid) attachCutBar(row.querySelector(".actioncol"), cvid, s);
+    if (cvid) { applyClipWindow(cvid, s); attachCutBar(row.querySelector(".actioncol"), cvid, s); }
     return row;
   }
 
@@ -717,7 +728,7 @@
       box.appendChild(h("div", { class: "sb-ph" }, "Todavía no hay storyboard ni fragmento. Subí una imagen o pegá una URL (imagen o video) para que la animación pueda producirse a partir de esto."));
     }
     d.appendChild(box);
-    if (video) attachCutBar(d, video, s);
+    if (video) { applyClipWindow(video, s); attachCutBar(d, video, s); }
 
     const ctr = h("div", { class: "sb-ctr" });
     const up = h("label", { class: "sb-up" }, "⬆ Subir imagen");
@@ -882,7 +893,11 @@
     const clone = JSON.parse(JSON.stringify(s)); clone.id = nextId();
     clone.startTime = fmtTime(at); clone.endTime = fmtTime(b); clone.storyBeat = "";
     // si hay un video, la segunda mitad arranca desde el punto de corte dentro del clip
-    if (clone.storyboard && isVideo(clone.storyboard)) clone.clipStart = (s.clipStart || 0) + (at - a);
+    if (clone.storyboard && isVideo(clone.storyboard)) {
+      const srcCut = (s.clipStart || 0) + (at - a);
+      clone.clipStart = srcCut;   // la 2da mitad arranca el clip en el corte (clone.clipEnd ya viene copiado = fin original)
+      s.clipEnd = srcCut;         // la 1ra mitad termina el clip en el corte
+    }
     // dividir la letra en el punto de corte (proporcional al tiempo), sin duplicarla
     const lraw = s.lyric || "";
     const lt = lraw.trim();
