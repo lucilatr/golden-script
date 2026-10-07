@@ -500,6 +500,8 @@
     return wrap;
   }
 
+  const isVideo = (u) => /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u || "") || String(u || "").indexOf("data:video") === 0;
+
   function buildCollapsedRow(s, open) {
     const row = h("div", { class: "row" + (open ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
     const lraw = (s.lyric || "").trim();
@@ -508,8 +510,10 @@
       ? '<div class="lyr instrumental">♪ Instrumental · sin letra</div>'
       : `<div class="lyr">${esc(lraw)}</div>`;
     const media = s.storyboard
-      ? `<div class="sbframe has"><img src="${esc(s.storyboard)}" alt="storyboard"></div>`
-      : `<div class="sbframe empty"><span>＋ storyboard / captura</span></div>`;
+      ? (isVideo(s.storyboard)
+          ? `<div class="sbframe has"><video src="${esc(s.storyboard)}" muted preload="metadata" playsinline></video><span class="sbplay">▶</span></div>`
+          : `<div class="sbframe has"><img src="${esc(s.storyboard)}" alt="storyboard"></div>`)
+      : `<div class="sbframe empty"><span>＋ storyboard / fragmento</span></div>`;
     row.innerHTML = `
       <div class="chev">${open ? "▾" : "▸"}</div>
       <div class="tc">${esc(s.startTime)}<small>${esc(s.endTime)} · ${dur(s)}s</small></div>
@@ -643,12 +647,14 @@
 
   function storyboardField(s) {
     const d = h("div", { class: "fg" });
-    d.appendChild(h("label", {}, "Acción — storyboard / captura de gameplay"));
+    d.appendChild(h("label", {}, "Acción — storyboard / fragmento animado"));
     const box = h("div", { class: "sbedit" });
-    if (s.storyboard) {
+    if (s.storyboard && isVideo(s.storyboard)) {
+      box.appendChild(h("video", { src: s.storyboard, controls: true, preload: "metadata", playsinline: true }));
+    } else if (s.storyboard) {
       box.appendChild(h("img", { src: s.storyboard, alt: "storyboard" }));
     } else {
-      box.appendChild(h("div", { class: "sb-ph" }, "Todavía no hay storyboard ni captura. Subí una imagen o pegá una URL para que el video pueda producirse a partir de esto."));
+      box.appendChild(h("div", { class: "sb-ph" }, "Todavía no hay storyboard ni fragmento. Subí una imagen o pegá una URL (imagen o video) para que la animación pueda producirse a partir de esto."));
     }
     d.appendChild(box);
 
