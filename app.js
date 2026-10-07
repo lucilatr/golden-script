@@ -146,7 +146,7 @@
 
   /* ---------------- State ---------------- */
   let data = { meta: seed().meta, segments: [] };
-  const ui = { openId: null, colorBy: "gameplayMode", showDetails: false, drawerMax: false,
+  const ui = { openId: null, colorBy: "gameplayMode", showDetails: false, showSync: false, drawerMax: false,
     filters: { gameplayMode: "", narrativeStage: "", status: "", location: "" } };
 
   /* ============================================================
@@ -652,13 +652,13 @@
      ============================================================ */
   function toggleRow(id) {
     ui.openId = (ui.openId === id) ? null : id;
-    ui.showDetails = false;
+    ui.showDetails = false; ui.showSync = false;
     renderMain();
     if (ui.openId) scrollToRow(ui.openId, "nearest");
   }
   // alias usados por timeline / CRUD para expandir una fila concreta
   function openDrawer(id) {
-    ui.openId = id; ui.showDetails = false;
+    ui.openId = id; ui.showDetails = false; ui.showSync = false;
     renderMain();
     scrollToRow(id, "center");
   }
@@ -710,8 +710,24 @@
     // Qué vemos (acción en pantalla)
     colMain.appendChild(fgText(s, "narrativeAction", "Acción — qué sucede en pantalla (no repitas escenario ni momento del día, ya están arriba)"));
 
-    // Sincronización de letra + momentos jugables → columna derecha
-    colBeats.appendChild(syncField(s));
+    // Sincronización de letra (colapsado por defecto) + momentos jugables → columna derecha
+    if (isRealLyric(s.lyric)) {
+      const sc = lyricSyncCount(s.lyric);
+      const syncToggle = h("button", { class: "details-toggle" + (ui.showSync ? " open" : "") },
+        [h("span", { class: "chev" }, "▶"), h("span", {}, "⏱ Sincronizar letra" + (sc.total ? ` (${sc.synced}/${sc.total})` : ""))]);
+      const syncWrap = h("div", { class: "details" + (ui.showSync ? " open" : "") });
+      let built = false;
+      const build = () => { if (!built) { syncWrap.appendChild(syncField(s)); built = true; } };
+      if (ui.showSync) build();
+      syncToggle.addEventListener("click", () => {
+        ui.showSync = !ui.showSync;
+        if (ui.showSync) build();
+        syncWrap.classList.toggle("open", ui.showSync);
+        syncToggle.classList.toggle("open", ui.showSync);
+      });
+      colBeats.appendChild(syncToggle);
+      colBeats.appendChild(syncWrap);
+    }
     colBeats.appendChild(beatsField(s));
 
     body.appendChild(colMain);
