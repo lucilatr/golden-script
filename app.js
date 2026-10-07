@@ -73,7 +73,7 @@
       location: "Seoul Streets", timeOfDay: "night", narrativeAction: "", characterAction: "",
       camera: "", gameplayMode: "frontal", playerAction: "", environmentInteraction: "",
       worldState: "normal", visualFX: "", transition: "", productionNotes: "", storyBeat: "", status: "idea",
-      sectionType: "",
+      sectionType: "", storyboard: "",
     };
     const mk = (id, a, b, over) => {
       const s = Object.assign({ id, startTime: a, endTime: b }, base, over);
@@ -206,9 +206,8 @@
         if (!seg) return;
         const i = data.segments.findIndex((s) => s.id === seg.id);
         if (i === -1) data.segments.push(seg); else data.segments[i] = seg;
-        // don't clobber a drawer the user is actively editing
-        if (ui.openId === seg.id && drawerFocused()) { renderMain(); return; }
-        if (ui.openId === seg.id) renderDrawer();
+        // no pisar la fila que el usuario está editando en este momento
+        if (ui.openId === seg.id && drawerFocused()) { refreshTimeline(); return; }
       }
       renderMain();
     },
@@ -217,7 +216,7 @@
       if (m && !headerFocused()) { data.meta = m; renderHeader(); }
     },
   };
-  function drawerFocused() { const a = document.activeElement; const d = el("drawer"); return a && d && d.contains(a); }
+  function drawerFocused() { const a = document.activeElement; const w = ui.openId ? document.querySelector(`.rowwrap[data-seg="${ui.openId}"]`) : null; return !!(a && w && w.contains(a)); }
   function headerFocused() { const a = document.activeElement; const h = el("header"); return a && h && h.contains(a); }
 
   /* ---------------- Persistence facade ---------------- */
@@ -240,6 +239,7 @@
     if (s.gameplayMode === "cinematic") s.gameplayMode = "frontal";
     if (!Array.isArray(s.beats)) s.beats = [];
     if (s.sectionType == null) s.sectionType = "";
+    if (s.storyboard == null) s.storyboard = "";
     return s;
   }
   function normalizeAll() { data.segments.forEach(normalizeSeg); }
@@ -357,10 +357,19 @@
   /* ---------- Main (hero + strip + filters + list) ---------- */
   function renderMain() {
     const host = el("main"); host.innerHTML = "";
-    renderHero(host);
-    renderGpStrip(host);
+    const tl = h("div", { id: "tl" });
+    host.appendChild(tl);
+    renderHero(tl);
+    renderGpStrip(tl);
     renderFilters(host);
     renderList(host);
+  }
+  // Refresca sólo el timeline (hero + strip), sin tocar la lista ni el editor inline
+  function refreshTimeline() {
+    const tl = el("tl"); if (!tl) return;
+    tl.innerHTML = "";
+    renderHero(tl);
+    renderGpStrip(tl);
   }
 
   function renderHero(host) {
@@ -435,19 +444,7 @@
 
   function renderGpStrip(host) {
     const segs = sorted();
-    const total = segs.reduce((a, s) => a + dur(s), 0) || 1;
-    const by = {}; GP.forEach((g) => (by[g.id] = 0));
-    segs.forEach((s) => { by[s.gameplayMode] = (by[s.gameplayMode] || 0) + dur(s); });
-    const strip = h("div", { class: "gpstrip" });
-    GP.forEach((g) => {
-      const secs = by[g.id] || 0, pct = Math.round((secs / total) * 100);
-      const c = h("div", { class: "gpcard" });
-      c.innerHTML = `<div class="top"><span class="nm" style="color:${g.color}">${esc(g.label)}</span><span class="pct">${pct}%</span></div>
-        <div class="bar"><span style="width:${pct}%;background:${g.color}"></span></div>
-        <div class="seglabel" style="margin-top:5px">${secs}s</div>`;
-      strip.appendChild(c);
-    });
-    host.appendChild(strip);
+    // (se eliminaron las tarjetas de porcentaje de gameplay por pedido)
 
     // longest run warning
     let runMode = null, runSecs = 0, longest = { mode: null, secs: 0 };
@@ -485,83 +482,88 @@
     const list = h("div", { class: "list" });
     const vis = sorted().filter(passes);
     const head = h("div", { class: "row row-head" });
-    head.innerHTML = `<div>Tiempo</div><div>Letra</div><div>Gameplay</div><div>Momento</div><div>Escenario</div><div>Acción</div><div></div>`;
+    head.innerHTML = `<div></div><div>Tiempo</div><div>Letra</div><div>Acción · storyboard</div><div></div>`;
     list.appendChild(head);
     if (!vis.length) list.appendChild(h("div", { class: "empty" }, "No hay bloques que coincidan con los filtros."));
-    vis.forEach((s) => list.appendChild(renderRow(s)));
+    vis.forEach((s) => list.appendChild(buildRowWrap(s)));
     const add = h("button", { class: "add-row" }, "+ Agregar bloque");
     add.addEventListener("click", addSegment);
     list.appendChild(add);
     host.appendChild(list);
   }
 
-  function renderRow(s) {
-    const row = h("div", { class: "row" + (ui.openId === s.id ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
+  function buildRowWrap(s) {
+    const open = ui.openId === s.id;
+    const wrap = h("div", { class: "rowwrap" + (open ? " open" : ""), "data-seg": s.id });
+    wrap.appendChild(buildCollapsedRow(s, open));
+    if (open) wrap.appendChild(buildInlineEditor(s));
+    return wrap;
+  }
+
+  function buildCollapsedRow(s, open) {
+    const row = h("div", { class: "row" + (open ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
     const lraw = (s.lyric || "").trim();
     const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
     const lyrHtml = instrumental
       ? '<div class="lyr instrumental">♪ Instrumental · sin letra</div>'
       : `<div class="lyr">${esc(lraw)}</div>`;
-    const gpTag = s.gameplayMode
-      ? `<span class="gp-tag gp-${s.gameplayMode}">${esc(labelOf(GP, s.gameplayMode))}</span>`
-      : `<span class="gp-tag gp-none">sin definir</span>`;
-    const tod = s.timeOfDay ? labelOf(TOD, s.timeOfDay) : "";
-    const loc = (s.location || "").trim();
+    const media = s.storyboard
+      ? `<div class="sbframe has"><img src="${esc(s.storyboard)}" alt="storyboard"></div>`
+      : `<div class="sbframe empty"><span>＋ storyboard / captura</span></div>`;
     row.innerHTML = `
+      <div class="chev">${open ? "▾" : "▸"}</div>
       <div class="tc">${esc(s.startTime)}<small>${esc(s.endTime)} · ${dur(s)}s</small></div>
       <div class="lyriccell">${lyrHtml}</div>
-      <div class="col-gp">${gpTag}</div>
-      <div class="col-tod">${tod ? esc(tod) : '<span class="muted">—</span>'}</div>
-      <div class="col-loc">${loc ? esc(loc) : '<span class="muted">—</span>'}</div>
-      <div class="actioncell">${s.narrativeAction ? esc(firstLine(s.narrativeAction)) : '<span class="muted">—</span>'}</div>
+      <div class="actioncol">${media}</div>
       <div class="right">
         ${(s.beats && s.beats.length) ? `<span class="tap-ind" title="${s.beats.length} momento(s) jugable(s)">⊙${s.beats.length}</span>` : ""}
         ${(s.storyBeat || "").trim() ? '<span class="star-ind" title="Story beat">★</span>' : ""}
         <span class="status-dot s-${s.status}" title="${esc(labelOf(STATUS, s.status))}"></span>
       </div>`;
-    row.addEventListener("click", () => openDrawer(s.id));
+    row.addEventListener("click", () => toggleRow(s.id));
     return row;
   }
 
+  // Actualiza sólo las celdas de resumen de la fila colapsada (sin reconstruir el editor)
+  function updateRowSummary(s) {
+    const row = document.querySelector(`.rowwrap[data-seg="${s.id}"] > .row`);
+    if (!row) return;
+    const lyrEl = row.querySelector(".lyr");
+    if (lyrEl) {
+      const lraw = (s.lyric || "").trim();
+      const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
+      lyrEl.className = "lyr" + (instrumental ? " instrumental" : "");
+      lyrEl.textContent = instrumental ? "♪ Instrumental · sin letra" : lraw;
+    }
+    const small = row.querySelector(".tc small");
+    if (small) small.textContent = s.endTime + " · " + dur(s) + "s";
+  }
+
   /* ============================================================
-     DRAWER (editor)
+     INLINE EDITOR (desplegable por fila)
      ============================================================ */
+  function toggleRow(id) {
+    ui.openId = (ui.openId === id) ? null : id;
+    ui.showDetails = false;
+    renderMain();
+    if (ui.openId) scrollToRow(ui.openId, "nearest");
+  }
+  // alias usados por timeline / CRUD para expandir una fila concreta
   function openDrawer(id) {
     ui.openId = id; ui.showDetails = false;
-    renderDrawer(); renderMain();
-    el("overlay").classList.add("open");
-    el("drawer").classList.add("open");
-  }
-  function closeDrawer() {
-    ui.openId = null;
-    el("overlay").classList.remove("open");
-    el("drawer").classList.remove("open");
     renderMain();
+    scrollToRow(id, "center");
   }
-  function renderDrawer() {
-    const d = el("drawer");
-    const s = data.segments.find((x) => x.id === ui.openId);
-    if (!s) { d.innerHTML = ""; return; }
-    d.style.setProperty("--stage-color", stageColor(s.narrativeStage));
-    d.classList.toggle("max", ui.drawerMax);
-    d.innerHTML = "";
+  function closeDrawer() { ui.openId = null; renderMain(); }
+  function renderDrawer() { /* no-op: el editor ahora es inline en la lista */ }
+  function scrollToRow(id, block) {
+    const w = document.querySelector(`.rowwrap[data-seg="${id}"]`);
+    if (w) w.scrollIntoView({ block: block || "nearest", behavior: "smooth" });
+  }
 
-    const head = h("div", { class: "drawer__head" });
-    head.innerHTML = `<span class="tc">${esc(s.startTime)} → ${esc(s.endTime)}</span>
-      <div class="dh-actions">
-        <button class="expand" title="${ui.drawerMax ? "Achicar" : "Pantalla completa"}">${ui.drawerMax ? "⤡" : "⤢"}</button>
-        <button class="close" title="Cerrar">×</button>
-      </div>`;
-    head.querySelector(".close").addEventListener("click", closeDrawer);
-    head.querySelector(".expand").addEventListener("click", (e) => {
-      ui.drawerMax = !ui.drawerMax;
-      d.classList.toggle("max", ui.drawerMax);
-      e.target.textContent = ui.drawerMax ? "⤡" : "⤢";
-      e.target.title = ui.drawerMax ? "Achicar" : "Pantalla completa";
-    });
-    d.appendChild(head);
-
-    const body = h("div", { class: "drawer__body" });
+  function buildInlineEditor(s) {
+    const wrap = h("div", { class: "rowedit", style: `--stage-color:${stageColor(s.narrativeStage)}` });
+    const body = h("div", { class: "rowedit-body" });
     const colMain = h("div", { class: "dcol dcol-main" });
     const colBeats = h("div", { class: "dcol dcol-beats" });
 
@@ -580,6 +582,9 @@
     colMain.appendChild(sectionField(s));
     colMain.appendChild(fgText(s, "lyric", "Lyric — pegá la letra. Si es solo música, dejalo vacío (se marca como instrumental)"));
     colMain.appendChild(fgInput(s, "musicalCue", "Cue musical (opcional)", "[BEAT DROP]"));
+
+    // Storyboard / captura de gameplay (la columna "Acción")
+    colMain.appendChild(storyboardField(s));
 
     // Gameplay
     colMain.appendChild(gpField(s));
@@ -602,7 +607,7 @@
     // Qué vemos (acción en pantalla)
     colMain.appendChild(fgText(s, "narrativeAction", "Acción — qué sucede en pantalla (no repitas escenario ni momento del día, ya están arriba)"));
 
-    // Momentos jugables → columna derecha (más espacio en pantalla completa)
+    // Momentos jugables → columna derecha
     colBeats.appendChild(beatsField(s));
 
     // Details toggle
@@ -628,32 +633,75 @@
 
     body.appendChild(colMain);
     body.appendChild(colBeats);
-    d.appendChild(body);
+    wrap.appendChild(body);
 
     // actions
-    const act = h("div", { class: "drawer__actions" });
+    const act = h("div", { class: "rowedit-actions" });
     const mk = (lbl, fn, cls) => { const b = h("button", { class: cls || "" }, lbl); b.addEventListener("click", fn); return b; };
-    act.appendChild(mk("▲", () => moveSegment(s.id, -1)));
-    act.appendChild(mk("▼", () => moveSegment(s.id, 1)));
+    act.appendChild(mk("▲ Subir", () => moveSegment(s.id, -1)));
+    act.appendChild(mk("▼ Bajar", () => moveSegment(s.id, 1)));
     act.appendChild(mk("⎘ Duplicar", () => duplicateSegment(s.id)));
     act.appendChild(mk("⇔ Dividir", () => splitSegment(s.id)));
     act.appendChild(h("span", { class: "sp" }));
-    act.appendChild(mk("🗑", () => deleteSegment(s.id), "del"));
-    d.appendChild(act);
+    act.appendChild(mk("▴ Cerrar", () => closeDrawer()));
+    act.appendChild(mk("🗑 Borrar", () => deleteSegment(s.id), "del"));
+    wrap.appendChild(act);
 
-    // wire inputs
-    body.querySelectorAll("[data-f]").forEach((inp) => {
+    // wire text inputs / selects (sin reconstruir el editor para no perder el foco)
+    wrap.querySelectorAll("[data-f]").forEach((inp) => {
       const f = inp.getAttribute("data-f");
+      if (inp.tagName === "SELECT") {
+        inp.addEventListener("change", (e) => { s[f] = e.target.value; persistSegment(s, true); renderMain(); });
+        return;
+      }
       inp.addEventListener("input", (e) => {
         s[f] = e.target.value;
         if (inp.getAttribute("data-tc")) {
-          const dn = body.querySelector("[data-dur]"); if (dn) dn.textContent = dur(s) + "s";
+          const dn = wrap.querySelector("[data-dur]"); if (dn) dn.textContent = dur(s) + "s";
         }
         persistSegment(s);
-        renderMain();
+        updateRowSummary(s);
+        refreshTimeline();
       });
-      if (inp.tagName === "SELECT") inp.addEventListener("change", () => { renderMain(); renderDrawer(); });
     });
+    return wrap;
+  }
+
+  function storyboardField(s) {
+    const d = h("div", { class: "fg" });
+    d.appendChild(h("label", {}, "Acción — storyboard / captura de gameplay"));
+    const box = h("div", { class: "sbedit" });
+    if (s.storyboard) {
+      box.appendChild(h("img", { src: s.storyboard, alt: "storyboard" }));
+    } else {
+      box.appendChild(h("div", { class: "sb-ph" }, "Todavía no hay storyboard ni captura. Subí una imagen o pegá una URL para que el video pueda producirse a partir de esto."));
+    }
+    d.appendChild(box);
+
+    const ctr = h("div", { class: "sb-ctr" });
+    const up = h("label", { class: "sb-up" }, "⬆ Subir imagen");
+    const file = h("input", { type: "file", accept: "image/*", style: "display:none" });
+    file.addEventListener("change", () => {
+      const f = file.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { s.storyboard = r.result; persistSegment(s, true); renderMain(); toast("Storyboard agregado"); };
+      r.readAsDataURL(f);
+    });
+    up.appendChild(file);
+    ctr.appendChild(up);
+
+    const url = h("input", { type: "text", class: "sb-url", placeholder: "…o pegá una URL de imagen / frame del video" });
+    url.value = (s.storyboard && s.storyboard.indexOf("data:") !== 0) ? s.storyboard : "";
+    url.addEventListener("change", () => { s.storyboard = url.value.trim(); persistSegment(s, true); renderMain(); });
+    ctr.appendChild(url);
+
+    if (s.storyboard) {
+      const rm = h("button", { class: "sb-rm" }, "Quitar");
+      rm.addEventListener("click", () => { s.storyboard = ""; persistSegment(s, true); renderMain(); });
+      ctr.appendChild(rm);
+    }
+    d.appendChild(ctr);
+    return d;
   }
   function wrapFg(inner) { const w = h("div", { class: "fg" }); w.appendChild(inner); return w; }
   function fgInput(s, f, label, ph) {
@@ -762,7 +810,7 @@
       musicalCue: "", lyric: "[LYRIC TO ADD]", status: "idea",
       narrativeAction: "", characterAction: "", camera: "", playerAction: "",
       environmentInteraction: "", visualFX: "", transition: "", productionNotes: "", storyBeat: "",
-      beats: [], sectionType: "", gameplayMode: "", worldState: "normal",
+      beats: [], sectionType: "", storyboard: "", gameplayMode: "", worldState: "normal",
       narrativeStage: last ? last.narrativeStage : "desire_insecurity",
       location: last ? last.location : "", timeOfDay: last ? last.timeOfDay : "night",
     });
