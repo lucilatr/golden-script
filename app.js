@@ -511,7 +511,7 @@
       : `<div class="lyr">${esc(lraw)}</div>`;
     const media = s.storyboard
       ? (isVideo(s.storyboard)
-          ? `<div class="sbframe has"><video src="${esc(s.storyboard)}" muted preload="metadata" playsinline></video><span class="sbplay">▶</span></div>`
+          ? `<div class="sbframe video"><video src="${esc(s.storyboard)}" controls preload="metadata" playsinline></video></div>`
           : `<div class="sbframe has"><img src="${esc(s.storyboard)}" alt="storyboard"></div>`)
       : `<div class="sbframe empty"><span>＋ storyboard / fragmento</span></div>`;
     row.innerHTML = `
@@ -525,6 +525,9 @@
         <span class="status-dot s-${s.status}" title="${esc(labelOf(STATUS, s.status))}"></span>
       </div>`;
     row.addEventListener("click", () => toggleRow(s.id));
+    // El área de video reproduce en la lista sin abrir el desplegable
+    const vbox = row.querySelector(".sbframe.video");
+    if (vbox) vbox.addEventListener("click", (e) => e.stopPropagation());
     return row;
   }
 
