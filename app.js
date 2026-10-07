@@ -658,7 +658,7 @@
     act.appendChild(mk("▲ Subir", () => moveSegment(s.id, -1)));
     act.appendChild(mk("▼ Bajar", () => moveSegment(s.id, 1)));
     act.appendChild(mk("⎘ Duplicar", () => duplicateSegment(s.id)));
-    act.appendChild(mk("⇔ Dividir", () => splitSegment(s.id)));
+    act.appendChild(mk("✂ Dividir bloque", () => splitSegment(s.id)));
     act.appendChild(h("span", { class: "sp" }));
     act.appendChild(mk("▴ Cerrar", () => closeDrawer()));
     act.appendChild(mk("🗑 Borrar", () => deleteSegment(s.id), "del"));
@@ -856,12 +856,16 @@
     const a = parseTime(s.startTime), b = parseTime(s.endTime);
     if (b - a < 2) { toast("Bloque muy corto para dividir"); return; }
     const mid = Math.round((a + b) / 2);
+    const ans = prompt(`¿En qué tiempo dividir el bloque? (MM:SS)\nTiene que estar entre ${s.startTime} y ${s.endTime}`, fmtTime(mid));
+    if (ans == null) return;
+    const at = parseTime(ans);
+    if (at <= a || at >= b) { toast("El tiempo tiene que estar dentro del bloque"); return; }
     const clone = JSON.parse(JSON.stringify(s)); clone.id = nextId();
-    clone.startTime = fmtTime(mid); clone.endTime = fmtTime(b); clone.storyBeat = "";
-    s.endTime = fmtTime(mid);
+    clone.startTime = fmtTime(at); clone.endTime = fmtTime(b); clone.storyBeat = "";
+    s.endTime = fmtTime(at);
     data.segments.push(clone);
     persistSegment(s, true); persistSegment(clone, true);
-    openDrawer(clone.id); toast("Bloque dividido");
+    openDrawer(clone.id); toast("Bloque dividido en " + fmtTime(at));
   }
   function moveSegment(id, dir) {
     const segs = sorted(); const pos = segs.findIndex((x) => x.id === id); const t = pos + dir;
