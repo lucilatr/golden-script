@@ -883,6 +883,17 @@
     clone.startTime = fmtTime(at); clone.endTime = fmtTime(b); clone.storyBeat = "";
     // si hay un video, la segunda mitad arranca desde el punto de corte dentro del clip
     if (clone.storyboard && isVideo(clone.storyboard)) clone.clipStart = (s.clipStart || 0) + (at - a);
+    // dividir la letra en el punto de corte (proporcional al tiempo), sin duplicarla
+    const lraw = s.lyric || "";
+    const lt = lraw.trim();
+    const realLyric = lt && lt !== "[LYRIC TO ADD]" && lraw.indexOf("[INTRO MUSIC") !== 0 && !(lt.charAt(0) === "[" && lt.charAt(lt.length - 1) === "]");
+    if (realLyric) {
+      const lines = lraw.split("\n");
+      let idx = Math.round(((at - a) / (b - a)) * lines.length);
+      idx = Math.max(0, Math.min(lines.length, idx));
+      s.lyric = lines.slice(0, idx).join("\n").replace(/\s+$/, "");
+      clone.lyric = lines.slice(idx).join("\n").replace(/^\s+/, "");
+    }
     s.endTime = fmtTime(at);
     data.segments.push(clone);
     persistSegment(s, true); persistSegment(clone, true);
