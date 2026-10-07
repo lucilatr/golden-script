@@ -502,13 +502,48 @@
 
   const isVideo = (u) => /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u || "") || String(u || "").indexOf("data:video") === 0;
 
-  function buildCollapsedRow(s, open) {
-    const row = h("div", { class: "row" + (open ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
+  function lyrCellHTML(s) {
     const lraw = (s.lyric || "").trim();
     const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
     const lyrHtml = instrumental
       ? '<div class="lyr instrumental">♪ Instrumental · sin letra</div>'
       : `<div class="lyr">${esc(lraw)}</div>`;
+    return lyrHtml + '<button class="lyr-edit" title="Editar letra acá">✎</button>';
+  }
+  function wireLyricCell(row, s) {
+    const pencil = row.querySelector(".lyriccell .lyr-edit");
+    if (pencil) pencil.addEventListener("click", (e) => { e.stopPropagation(); startLyricEdit(row, s); });
+  }
+  function startLyricEdit(row, s) {
+    const cell = row.querySelector(".lyriccell");
+    if (!cell || cell.querySelector(".lyr-edit-ta")) return;
+    const raw = s.lyric || "";
+    const ta = h("textarea", { class: "lyr-edit-ta", rows: "4" });
+    ta.value = (raw.trim() === "[LYRIC TO ADD]") ? "" : raw;
+    cell.innerHTML = "";
+    cell.appendChild(ta);
+    const stop = (e) => e.stopPropagation();
+    ta.addEventListener("click", stop);
+    ta.addEventListener("mousedown", stop);
+    let done = false;
+    const finish = (save) => {
+      if (done) return; done = true;
+      if (save) { s.lyric = ta.value; persistSegment(s, true); }
+      cell.innerHTML = lyrCellHTML(s);
+      wireLyricCell(row, s);
+      refreshTimeline();
+    };
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ta.blur(); }
+      else if (e.key === "Escape") { e.preventDefault(); done = true; cell.innerHTML = lyrCellHTML(s); wireLyricCell(row, s); }
+    });
+    ta.addEventListener("blur", () => finish(true));
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
+  function buildCollapsedRow(s, open) {
+    const row = h("div", { class: "row" + (open ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
     const media = s.storyboard
       ? (isVideo(s.storyboard)
           ? `<div class="sbframe video"><video src="${esc(s.storyboard)}" controls preload="metadata" playsinline></video></div>`
@@ -517,7 +552,7 @@
     row.innerHTML = `
       <div class="chev">${open ? "▾" : "▸"}</div>
       <div class="tc">${esc(s.startTime)}<small>${esc(s.endTime)} · ${dur(s)}s</small></div>
-      <div class="lyriccell">${lyrHtml}</div>
+      <div class="lyriccell">${lyrCellHTML(s)}</div>
       <div class="actioncol">${media}</div>
       <div class="right">
         ${(s.beats && s.beats.length) ? `<span class="tap-ind" title="${s.beats.length} momento(s) jugable(s)">⊙${s.beats.length}</span>` : ""}
@@ -525,6 +560,7 @@
         <span class="status-dot s-${s.status}" title="${esc(labelOf(STATUS, s.status))}"></span>
       </div>`;
     row.addEventListener("click", () => toggleRow(s.id));
+    wireLyricCell(row, s);
     // El área de video reproduce en la lista sin abrir el desplegable
     const vbox = row.querySelector(".sbframe.video");
     if (vbox) vbox.addEventListener("click", (e) => e.stopPropagation());

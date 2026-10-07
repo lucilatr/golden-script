@@ -184,7 +184,19 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .row .chev { color: var(--text-dim); font-size: 12px; text-align: center; }
 .row .tc { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; }
 .row .tc small { display: block; color: var(--text-dim); font-size: 10px; }
-.row .lyriccell { min-width: 0; }
+.row .lyriccell { position: relative; min-width: 0; padding-right: 22px; }
+.row .lyr-edit {
+  position: absolute; top: -2px; right: 0; background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 14px; opacity: 0; transition: opacity .12s; padding: 2px 4px; line-height: 1;
+}
+.row:hover .lyr-edit { opacity: .55; }
+.row .lyr-edit:hover { opacity: 1; color: var(--accent-2); }
+.lyr-edit-ta {
+  width: 100%; min-height: 72px; background: var(--bg-3); border: 1px solid var(--accent);
+  border-radius: var(--radius-s); padding: 7px 9px; color: var(--text); font-size: 12.5px;
+  line-height: 1.45; resize: vertical; font-family: inherit;
+}
+.lyr-edit-ta:focus { outline: none; }
 .row .lyr {
   color: var(--text); white-space: pre-line;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
