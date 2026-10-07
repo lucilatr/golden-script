@@ -240,6 +240,7 @@
     if (!Array.isArray(s.beats)) s.beats = [];
     if (s.sectionType == null) s.sectionType = "";
     if (s.storyboard == null) s.storyboard = "";
+    if (s.clipStart == null) s.clipStart = 0;
     return s;
   }
   function normalizeAll() { data.segments.forEach(normalizeSeg); }
@@ -502,6 +503,22 @@
 
   const isVideo = (u) => /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u || "") || String(u || "").indexOf("data:video") === 0;
 
+  // Barra tipo Premiere: reproducir el clip, pausar y cortar el bloque en el playhead
+  function attachCutBar(host, video, s) {
+    const off = s.clipStart || 0;
+    if (off) video.addEventListener("loadedmetadata", () => { try { video.currentTime = off; } catch (e) {} });
+    const start = parseTime(s.startTime);
+    const songAt = () => start + Math.max(0, (video.currentTime || 0) - off);
+    const bar = h("div", { class: "sb-cutbar" });
+    const cut = h("button", { class: "sb-cut", title: "Dividir el bloque en el punto donde está pausado el video" }, "✂ Cortar acá");
+    const info = h("span", { class: "sb-cut-time" }, "⏱ " + s.startTime);
+    video.addEventListener("timeupdate", () => { info.textContent = "⏱ " + fmtTime(songAt()); });
+    cut.addEventListener("click", (e) => { e.stopPropagation(); splitSegmentAt(s.id, songAt()); });
+    bar.addEventListener("click", (e) => e.stopPropagation());
+    bar.appendChild(cut); bar.appendChild(info);
+    host.appendChild(bar);
+  }
+
   function lyrCellHTML(s) {
     const lraw = (s.lyric || "").trim();
     const instrumental = (lraw === "" || lraw === "[LYRIC TO ADD]" || lraw.indexOf("[INTRO MUSIC") === 0);
@@ -564,6 +581,8 @@
     // El área de video reproduce en la lista sin abrir el desplegable
     const vbox = row.querySelector(".sbframe.video");
     if (vbox) vbox.addEventListener("click", (e) => e.stopPropagation());
+    const cvid = row.querySelector(".sbframe.video video");
+    if (cvid) attachCutBar(row.querySelector(".actioncol"), cvid, s);
     return row;
   }
 
@@ -688,14 +707,17 @@
     const d = h("div", { class: "fg" });
     d.appendChild(h("label", {}, "Acción — storyboard / fragmento animado"));
     const box = h("div", { class: "sbedit" });
+    let video = null;
     if (s.storyboard && isVideo(s.storyboard)) {
-      box.appendChild(h("video", { src: s.storyboard, controls: true, preload: "metadata", playsinline: true }));
+      video = h("video", { src: s.storyboard, controls: true, preload: "metadata", playsinline: true });
+      box.appendChild(video);
     } else if (s.storyboard) {
       box.appendChild(h("img", { src: s.storyboard, alt: "storyboard" }));
     } else {
       box.appendChild(h("div", { class: "sb-ph" }, "Todavía no hay storyboard ni fragmento. Subí una imagen o pegá una URL (imagen o video) para que la animación pueda producirse a partir de esto."));
     }
     d.appendChild(box);
+    if (video) attachCutBar(d, video, s);
 
     const ctr = h("div", { class: "sb-ctr" });
     const up = h("label", { class: "sb-up" }, "⬆ Subir imagen");
@@ -851,21 +873,28 @@
     data.segments = data.segments.filter((x) => x.id !== id);
     persistDelete(id); closeDrawer(); toast("Bloque borrado");
   }
-  function splitSegment(id) {
+  function splitSegmentAt(id, at) {
     const s = data.segments.find((x) => x.id === id); if (!s) return;
     const a = parseTime(s.startTime), b = parseTime(s.endTime);
     if (b - a < 2) { toast("Bloque muy corto para dividir"); return; }
-    const mid = Math.round((a + b) / 2);
-    const ans = prompt(`¿En qué tiempo dividir el bloque? (MM:SS)\nTiene que estar entre ${s.startTime} y ${s.endTime}`, fmtTime(mid));
-    if (ans == null) return;
-    const at = parseTime(ans);
-    if (at <= a || at >= b) { toast("El tiempo tiene que estar dentro del bloque"); return; }
+    at = Math.round(at);
+    if (at <= a || at >= b) { toast("El corte tiene que estar dentro del bloque"); return; }
     const clone = JSON.parse(JSON.stringify(s)); clone.id = nextId();
     clone.startTime = fmtTime(at); clone.endTime = fmtTime(b); clone.storyBeat = "";
+    // si hay un video, la segunda mitad arranca desde el punto de corte dentro del clip
+    if (clone.storyboard && isVideo(clone.storyboard)) clone.clipStart = (s.clipStart || 0) + (at - a);
     s.endTime = fmtTime(at);
     data.segments.push(clone);
     persistSegment(s, true); persistSegment(clone, true);
     openDrawer(clone.id); toast("Bloque dividido en " + fmtTime(at));
+  }
+  function splitSegment(id) {
+    const s = data.segments.find((x) => x.id === id); if (!s) return;
+    const a = parseTime(s.startTime), b = parseTime(s.endTime);
+    if (b - a < 2) { toast("Bloque muy corto para dividir"); return; }
+    const ans = prompt(`¿En qué tiempo dividir el bloque? (MM:SS)\nTiene que estar entre ${s.startTime} y ${s.endTime}`, fmtTime(Math.round((a + b) / 2)));
+    if (ans == null) return;
+    splitSegmentAt(id, parseTime(ans));
   }
   function moveSegment(id, dir) {
     const segs = sorted(); const pos = segs.findIndex((x) => x.id === id); const t = pos + dir;
