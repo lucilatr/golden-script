@@ -798,7 +798,8 @@
 
     // (La "Acción" ahora se edita directo en su columna de la planilla, con doble clic)
 
-    // (La sincronización de letra ahora es un apartado único para toda la canción)
+    // Timecodes de la letra de este bloque (marcados en el apartado global) + ajustar inicio
+    if (isRealLyric(s.lyric)) colBeats.appendChild(blockTimecodesField(s));
     colBeats.appendChild(beatsField(s));
 
     body.appendChild(colMain);
@@ -1056,6 +1057,48 @@
     d.appendChild(set);
     return d;
   }
+
+  // Timecodes de la letra del bloque (editables) + botón para ajustar el inicio del bloque
+  function blockTimecodesField(s) {
+    const d = h("div", { class: "fg sync-fg" });
+    const sc = lyricSyncCount(s.lyric);
+    d.appendChild(h("label", {}, `⏱ Timecodes de la letra (${sc.synced}/${sc.total})`));
+    d.appendChild(h("div", { class: "beats-hint" }, "Los marcás en «⏱ Sincronizar letra» (arriba). Acá los ves/editás y con el botón movés el inicio del bloque a la 1ª línea."));
+    const parsed = parseLyric(s.lyric);
+    const save = () => { s.lyric = fmtLyric(parsed); persistSegment(s, true); refreshLyricCell(s); refreshTimeline(); };
+    const list = h("div", { class: "sync-list" });
+    parsed.forEach((ln, i) => {
+      if (!ln.text.trim()) return;
+      const r = h("div", { class: "sync-row norow" });
+      const tin = h("input", { type: "text", class: "sync-t", value: ln.t != null ? fmtTime(ln.t) : "", placeholder: "--:--" });
+      tin.addEventListener("change", () => { const v = tin.value.trim(); parsed[i].t = v ? parseTime(v) : null; save(); });
+      r.appendChild(tin); r.appendChild(h("span", { class: "sync-txt", title: ln.text }, ln.text));
+      list.appendChild(r);
+    });
+    d.appendChild(list);
+    const snap = h("button", { class: "sync-snap" }, "⇄ Ajustar inicio del bloque a la 1ª línea");
+    snap.addEventListener("click", () => snapBlockStartToLyric(s));
+    d.appendChild(snap);
+    return d;
+  }
+
+  // Mueve el inicio del bloque (y el fin del anterior) al tiempo de su 1ª línea marcada
+  function snapBlockStartToLyric(s) {
+    const first = parseLyric(s.lyric).find((l) => l.t != null && l.text.trim());
+    if (!first) { toast("Marcá primero el tiempo de la 1ª línea"); return; }
+    const t = first.t, a = parseTime(s.startTime);
+    if (t === a) { toast("El inicio ya coincide con la 1ª línea"); return; }
+    snapshot("ajustar inicio a letra");
+    const segs = sorted();
+    const idx = segs.findIndex((x) => x.id === s.id);
+    const prev = idx > 0 ? segs[idx - 1] : null;
+    s.startTime = fmtTime(t); if (s.clipStart != null) s.clipStart = t;
+    if (prev) { prev.endTime = fmtTime(t); if (prev.clipEnd != null) prev.clipEnd = t; persistSegment(prev, true); }
+    persistSegment(s, true);
+    renderMain();
+    toast("Inicio del bloque ajustado a " + fmtTime(t));
+  }
+
   function beatsField(s) {
     const d = h("div", { class: "fg beats-fg" });
     d.appendChild(h("label", {}, "Momentos jugables — el tap modifica la acción"));

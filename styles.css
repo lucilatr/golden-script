@@ -347,6 +347,11 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   padding: 9px 18px; border-radius: 30px; cursor: pointer;
 }
 .sync-apply:hover { background: var(--accent-2); }
+.sync-snap {
+  margin-top: 10px; width: 100%; background: #e8e8ec; color: #1a1a1a; border: 1px solid #cfcfd6;
+  border-radius: var(--radius-s); padding: 8px; cursor: pointer; font-size: 12px; font-weight: 700;
+}
+.sync-snap:hover { background: #fff; border-color: #fff; }
 
 .sec-tag {
   display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 10px;
