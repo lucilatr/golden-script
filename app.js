@@ -933,7 +933,7 @@
   function beatsField(s) {
     const d = h("div", { class: "fg beats-fg" });
     d.appendChild(h("label", {}, "Momentos jugables — el tap modifica la acción"));
-    d.appendChild(h("div", { class: "beats-hint" }, "Cada momento: qué nota se tapea y qué pasa en cada resultado — Golden Tap (Perfect), Good y Miss."));
+    d.appendChild(h("div", { class: "beats-hint" }, "Cada momento: qué nota se tapea y qué pasa en cada resultado — Golden, Good y Miss."));
     const list = h("div", { class: "beatlist" });
     (s.beats || []).forEach((b, i) => list.appendChild(beatCard(s, b, i)));
     d.appendChild(list);
@@ -967,7 +967,7 @@
       box.appendChild(ta);
       return box;
     };
-    io.appendChild(mkState("perfect", "Golden Tap · Perfect", "onPerfect", "Ejecución perfecta: efecto dorado, bonus visual, la coreografía llega a su punto máximo"));
+    io.appendChild(mkState("perfect", "Golden", "onPerfect", "Ejecución perfecta: efecto dorado, bonus visual, la coreografía llega a su punto máximo"));
     io.appendChild(mkState("hit", "Good", "onHit", "Acierto correcto: sigue bailando sin perder el flow"));
     io.appendChild(mkState("miss", "Miss", "onMiss", "Falla: se tropieza levemente y se recupera, retomando la coreografía"));
     c.appendChild(io);
