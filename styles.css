@@ -333,6 +333,23 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   padding: 8px 14px; border-radius: 30px; cursor: pointer; letter-spacing: .3px;
 }
 .btn-sync:hover { background: var(--bg-hover); color: var(--accent); border-color: var(--accent); }
+.btn-help {
+  background: var(--bg-3); color: var(--text-2); border: 1px solid var(--line-2); font-weight: 600;
+  padding: 7px 14px; border-radius: 30px; cursor: pointer; letter-spacing: .3px; font-size: 13px;
+}
+.btn-help:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--accent); }
+
+/* modal de ayuda */
+.drawer.help-modal { width: 94vw; max-width: 720px; top: 3vh; height: 94vh;
+  border-radius: var(--radius); border: 1px solid var(--line-2); }
+.drawer.help-modal.open { left: 50%; right: auto; transform: translateX(-50%); }
+.help-body { line-height: 1.55; }
+.help-lead { color: var(--text); font-size: 14px; margin: 0 0 6px; }
+.help-body h3 { color: var(--accent-2); font-size: 13px; letter-spacing: .3px; margin: 18px 0 6px;
+  text-transform: uppercase; }
+.help-body ul { margin: 0; padding-left: 18px; color: var(--text-2); font-size: 13px; }
+.help-body li { margin: 4px 0; }
+.help-body b { color: var(--text); }
 .drawer.sync-modal { width: 94vw; max-width: 760px; top: 3vh; height: 94vh;
   border-radius: var(--radius); border: 1px solid var(--line-2); }
 .drawer.sync-modal.open { left: 50%; right: auto; transform: translateX(-50%); }

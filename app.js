@@ -370,10 +370,10 @@
     meta.innerHTML = `
       <span class="sync-ind ${Sync.enabled ? "live" : "local"}"><span class="dot"></span>${Sync.enabled ? "Online (en vivo)" : "Local"}</span>
       <span class="mini"><span class="key">Dur</span><input class="dur" id="m-dur" type="text" value="${esc(data.meta.songDuration)}"></span>
-      <span class="mini"><span class="dot" id="m-dot" style="background:${DOC_STATUS_COLOR[data.meta.status] || "#888"}"></span>
-        <select id="m-status">${opts(DOC_STATUS, data.meta.status)}</select></span>
-      <span class="mini"><span class="key">Ver</span><input id="m-ver" type="text" value="${esc(data.meta.version)}" style="width:44px"></span>
       <span class="mini key" id="m-upd">${esc(fmtDate(data.meta.lastUpdated))}</span>`;
+    const helpBtn = h("button", { class: "btn-help", title: "Cómo funciona este sitio" }, "? Preguntas frecuentes");
+    helpBtn.addEventListener("click", openHelp);
+    meta.appendChild(helpBtn);
     host.appendChild(meta);
 
     const right = h("div", { class: "header__meta" });
@@ -402,9 +402,79 @@
     host.appendChild(right);
 
     el("m-dur").addEventListener("change", (e) => { data.meta.songDuration = e.target.value; persistMeta(); renderMain(); });
-    el("m-status").addEventListener("change", (e) => { data.meta.status = e.target.value; el("m-dot").style.background = DOC_STATUS_COLOR[e.target.value] || "#888"; persistMeta(); });
-    el("m-ver").addEventListener("change", (e) => { data.meta.version = e.target.value; persistMeta(); });
   }
+
+  /* ---------- Ayuda / Preguntas frecuentes ---------- */
+  function openHelp() {
+    const ov = el("overlay"), dr = el("drawer");
+    dr.classList.add("help-modal");
+    dr.innerHTML = "";
+    const head = h("div", { class: "drawer__head" });
+    head.innerHTML = `<span class="tc">? Preguntas frecuentes</span>
+      <div class="dh-actions"><button class="close" title="Cerrar">×</button></div>`;
+    head.querySelector(".close").addEventListener("click", closeHelp);
+    dr.appendChild(head);
+    const body = h("div", { class: "drawer__body help-body" });
+    body.innerHTML = HELP_HTML;
+    dr.appendChild(body);
+    ov.classList.add("open"); dr.classList.add("open");
+  }
+  function closeHelp() {
+    const ov = el("overlay"), dr = el("drawer");
+    ov.classList.remove("open"); dr.classList.remove("open"); dr.classList.remove("help-modal");
+    dr.innerHTML = "";
+  }
+  const HELP_HTML = `
+    <p class="help-lead">Herramienta para desglosar la canción en bloques y planear, por cada tramo, <b>qué se canta, qué pasa en pantalla y cómo se juega</b>. La edición es compartida y en vivo: varias personas a la vez.</p>
+
+    <h3>La pantalla</h3>
+    <ul>
+      <li><b>Arriba:</b> la línea de tiempo de la canción.</li>
+      <li><b>Abajo:</b> la planilla, un bloque por sección, en columnas <b>Tiempo · Letra · Acción · Storyboard/clip</b>.</li>
+    </ul>
+
+    <h3>Editar en la planilla</h3>
+    <ul>
+      <li><b>Doble clic</b> en la <b>Letra</b> o en la <b>Acción</b> para escribir ahí mismo (o el lapicito ✎). Se guarda al salir; <b>Esc</b> cancela.</li>
+      <li>La flechita <b>▸</b> despliega el bloque para ver/editar el detalle: escenario, momento del día, gameplay, etapa narrativa, estado, momentos jugables y timecodes.</li>
+    </ul>
+
+    <h3>Storyboard / clip</h3>
+    <ul>
+      <li>Cada bloque muestra su fragmento de video; se reproduce ahí mismo (no abre el desplegable).</li>
+      <li>En el desplegable podés subir una imagen o pegar una URL (imagen o video).</li>
+    </ul>
+
+    <h3>Cortar bloques (tipo Premiere)</h3>
+    <ul>
+      <li>Reproducís el clip del bloque, lo pausás donde querés y tocás <b>✂ Cortar</b>: el bloque se divide en dos en ese punto, repartiendo la letra y el video.</li>
+      <li>El bloque nuevo queda colapsado; lo abrís con la flechita.</li>
+      <li>También hay <b>✂ Dividir bloque</b> (por tiempo escrito) dentro del desplegable.</li>
+    </ul>
+
+    <h3>Sincronizar la letra</h3>
+    <ul>
+      <li>Botón <b>⏱ Sincronizar letra</b> (arriba): abre un panel con el video de toda la canción y <b>todas las frases en orden</b>. Reproducís y tocás <b>⏱</b> en cada línea cuando entra (o escribís el tiempo). Se guarda al instante.</li>
+      <li><b>Aplicar a bloques</b> ajusta los bordes de cada bloque según los tiempos marcados.</li>
+      <li>En cada bloque, dentro de <b>⏱ Timecodes de la letra</b>, podés tocar <b>⇄ Ajustar inicio del bloque a la 1ª línea</b>.</li>
+    </ul>
+
+    <h3>Momentos jugables</h3>
+    <ul>
+      <li>Por cada tap se describe qué pasa en los tres resultados: <b style="color:#f0c23c">Golden</b> (perfect), <b style="color:#5fcf8f">Good</b> y <b style="color:#f0685c">Miss</b>.</li>
+    </ul>
+
+    <h3>Deshacer y guardado</h3>
+    <ul>
+      <li><b>↶ Deshacer</b> revierte cortes y cambios de bloque, <b>sin perder los timecodes</b> ya marcados.</li>
+      <li>Todo se guarda solo en la nube (en vivo, compartido). No hace falta "guardar".</li>
+    </ul>
+
+    <h3>Línea de tiempo</h3>
+    <ul>
+      <li>Podés colorearla por Gameplay, Sección, Etapa, Mundo o Locación con los botones de arriba.</li>
+      <li>Click en un bloque de la barra salta a editarlo.</li>
+    </ul>`;
   function refreshUpdated() { const n = el("m-upd"); if (n) n.textContent = fmtDate(data.meta.lastUpdated); }
 
   /* ---------- Main (hero + strip + filters + list) ---------- */
@@ -1281,11 +1351,17 @@
     // global click closes menu
     document.addEventListener("click", () => { const m = el("menu"); if (m) m.classList.remove("open"); });
     el("overlay").addEventListener("click", () => {
-      if (el("drawer").classList.contains("sync-modal")) closeLyricSync(); else closeDrawer();
+      const dr = el("drawer");
+      if (dr.classList.contains("help-modal")) closeHelp();
+      else if (dr.classList.contains("sync-modal")) closeLyricSync();
+      else closeDrawer();
     });
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      if (el("drawer").classList.contains("sync-modal")) closeLyricSync(); else if (ui.openId) closeDrawer();
+      const dr = el("drawer");
+      if (dr.classList.contains("help-modal")) closeHelp();
+      else if (dr.classList.contains("sync-modal")) closeLyricSync();
+      else if (ui.openId) closeDrawer();
     });
 
     if (Sync.init()) {
