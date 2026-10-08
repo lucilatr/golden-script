@@ -798,8 +798,22 @@
 
     // (La "Acción" ahora se edita directo en su columna de la planilla, con doble clic)
 
-    // Timecodes de la letra de este bloque (marcados en el apartado global) + ajustar inicio
-    if (isRealLyric(s.lyric)) colBeats.appendChild(blockTimecodesField(s));
+    // Timecodes de la letra de este bloque — colapsado por defecto, se despliega a mano
+    if (isRealLyric(s.lyric)) {
+      const sc = lyricSyncCount(s.lyric);
+      const tcToggle = h("button", { class: "details-toggle" },
+        [h("span", { class: "chev" }, "▶"), h("span", {}, `⏱ Timecodes de la letra (${sc.synced}/${sc.total})`)]);
+      const tcWrap = h("div", { class: "details" });
+      let built = false;
+      tcToggle.addEventListener("click", () => {
+        const open = !tcWrap.classList.contains("open");
+        if (open && !built) { tcWrap.appendChild(blockTimecodesField(s)); built = true; }
+        tcWrap.classList.toggle("open", open);
+        tcToggle.classList.toggle("open", open);
+      });
+      colBeats.appendChild(tcToggle);
+      colBeats.appendChild(tcWrap);
+    }
     colBeats.appendChild(beatsField(s));
 
     body.appendChild(colMain);
@@ -1061,8 +1075,6 @@
   // Timecodes de la letra del bloque (editables) + botón para ajustar el inicio del bloque
   function blockTimecodesField(s) {
     const d = h("div", { class: "fg sync-fg" });
-    const sc = lyricSyncCount(s.lyric);
-    d.appendChild(h("label", {}, `⏱ Timecodes de la letra (${sc.synced}/${sc.total})`));
     d.appendChild(h("div", { class: "beats-hint" }, "Los marcás en «⏱ Sincronizar letra» (arriba). Acá los ves/editás y con el botón movés el inicio del bloque a la 1ª línea."));
     const parsed = parseLyric(s.lyric);
     const save = () => { s.lyric = fmtLyric(parsed); persistSegment(s, true); refreshLyricCell(s); refreshTimeline(); };
