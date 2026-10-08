@@ -377,6 +377,9 @@
     host.appendChild(meta);
 
     const right = h("div", { class: "header__meta" });
+    const syncBtn = h("button", { class: "btn-sync", title: "Sincronizar la letra de toda la canción" }, "⏱ Sincronizar letra");
+    syncBtn.addEventListener("click", openLyricSync);
+    right.appendChild(syncBtn);
     const undoBtn = h("button", { class: "btn-undo", id: "undo-btn", title: "Deshacer" }, "↶ Deshacer");
     undoBtn.disabled = !UNDO.length;
     undoBtn.addEventListener("click", undo);
@@ -795,24 +798,7 @@
 
     // (La "Acción" ahora se edita directo en su columna de la planilla, con doble clic)
 
-    // Sincronización de letra (colapsado por defecto) + momentos jugables → columna derecha
-    if (isRealLyric(s.lyric)) {
-      const sc = lyricSyncCount(s.lyric);
-      const syncToggle = h("button", { class: "details-toggle" + (ui.showSync ? " open" : "") },
-        [h("span", { class: "chev" }, "▶"), h("span", {}, "⏱ Sincronizar letra" + (sc.total ? ` (${sc.synced}/${sc.total})` : ""))]);
-      const syncWrap = h("div", { class: "details" + (ui.showSync ? " open" : "") });
-      let built = false;
-      const build = () => { if (!built) { syncWrap.appendChild(syncField(s)); built = true; } };
-      if (ui.showSync) build();
-      syncToggle.addEventListener("click", () => {
-        ui.showSync = !ui.showSync;
-        if (ui.showSync) build();
-        syncWrap.classList.toggle("open", ui.showSync);
-        syncToggle.classList.toggle("open", ui.showSync);
-      });
-      colBeats.appendChild(syncToggle);
-      colBeats.appendChild(syncWrap);
-    }
+    // (La sincronización de letra ahora es un apartado único para toda la canción)
     colBeats.appendChild(beatsField(s));
 
     body.appendChild(colMain);
@@ -893,69 +879,129 @@
     return d;
   }
 
-  // Panel de sincronización de letra: marcar el tiempo de cada línea con el video
-  function syncField(s) {
-    const d = h("div", { class: "fg sync-fg" });
-    d.appendChild(h("label", {}, "⏱ Sincronizar letra — tiempo de cada línea"));
-    if (!isRealLyric(s.lyric)) {
-      d.appendChild(h("div", { class: "beats-hint" }, "Este bloque no tiene letra para sincronizar."));
-      return d;
-    }
-    d.appendChild(h("div", { class: "beats-hint" }, "Acá el video rueda por TODA la canción (podés marcar aunque la frase caiga cerca de un borde). Cuando empieza cada frase, tocá ⏱ en esa línea (o escribí el tiempo). Después, con «⇄ Ajustar corte» movés el borde del bloque a su 1ª línea."));
-    const parsed = parseLyric(s.lyric);
-    let video = null, songAt = () => null;
-    if (s.storyboard && isVideo(s.storyboard)) {
-      const vbox = h("div", { class: "sbedit sync-video" });
-      video = h("video", { src: s.storyboard, controls: true, preload: "metadata", playsinline: true });
-      vbox.appendChild(video); d.appendChild(vbox);
-      // En sincronización el video NO se limita a la ventana del bloque:
-      // rueda por toda la canción para poder marcar cualquier frase.
-      const seekInit = () => { try { video.currentTime = s.clipStart || parseTime(s.startTime); } catch (e) {} };
-      if (video.readyState >= 1) seekInit(); else video.addEventListener("loadedmetadata", seekInit, { once: true });
-      const off = s.clipStart || 0, start = parseTime(s.startTime);
-      songAt = () => start + ((video.currentTime || 0) - off); // = tiempo real de canción (clip = canción completa)
-      const ph = h("div", { class: "sync-playhead" }, "⏱ " + s.startTime);
-      video.addEventListener("timeupdate", () => { ph.textContent = "⏱ " + fmtTime(songAt()); });
-      d.appendChild(ph);
-    } else {
-      d.appendChild(h("div", { class: "beats-hint" }, "Sin video en este bloque: podés escribir el tiempo a mano."));
-    }
-    const save = () => { s.lyric = fmtLyric(parsed); persistSegment(s, true); refreshLyricCell(s); refreshTimeline(); };
-    const list = h("div", { class: "sync-list" });
-    parsed.forEach((ln, i) => {
-      if (!ln.text.trim()) return;
-      const r = h("div", { class: "sync-row" });
-      const tin = h("input", { type: "text", class: "sync-t", value: ln.t != null ? fmtTime(ln.t) : "", placeholder: "--:--" });
-      tin.addEventListener("change", () => { const v = tin.value.trim(); parsed[i].t = v ? parseTime(v) : null; save(); });
-      const mark = h("button", { class: "sync-mark", title: "Marcar con el tiempo del video" }, "⏱");
-      if (!video) mark.disabled = true;
-      mark.addEventListener("click", () => { const t = songAt(); if (t == null) return; parsed[i].t = Math.max(0, Math.round(t)); tin.value = fmtTime(parsed[i].t); save(); });
-      r.appendChild(tin); r.appendChild(mark); r.appendChild(h("span", { class: "sync-txt", title: ln.text }, ln.text));
-      list.appendChild(r);
-    });
-    d.appendChild(list);
-    // Ajustar el borde del bloque a su primera línea marcada
-    const snap = h("button", { class: "sync-snap" }, "⇄ Ajustar corte del bloque a la 1ª línea");
-    snap.addEventListener("click", () => snapBlockStartToLyric(s));
-    d.appendChild(snap);
-    return d;
+  /* ============================================================
+     SINCRONIZACIÓN GLOBAL DE LETRA (apartado único, toda la canción)
+     ============================================================ */
+  // Fuente de video para el panel: el clip de canción completa de cualquier bloque
+  function fullSongClip() {
+    const withVid = data.segments.find((s) => s.storyboard && isVideo(s.storyboard) && (s.clipStart || 0) === parseTime(s.startTime));
+    return withVid ? withVid.storyboard : (data.segments.find((s) => s.storyboard && isVideo(s.storyboard)) || {}).storyboard || "";
   }
 
-  // Mueve el inicio del bloque (y el fin del anterior) al tiempo de su 1ª línea marcada
-  function snapBlockStartToLyric(s) {
-    const first = parseLyric(s.lyric).find((l) => l.t != null && l.text.trim());
-    if (!first) { toast("Marcá primero el tiempo de la 1ª línea"); return; }
-    const t = first.t, a = parseTime(s.startTime);
-    if (t === a) { toast("El corte ya coincide con la 1ª línea"); return; }
-    snapshot("ajustar corte a letra");
-    const segs = sorted();
-    const idx = segs.findIndex((x) => x.id === s.id);
-    const prev = idx > 0 ? segs[idx - 1] : null;
-    s.startTime = fmtTime(t); if (s.clipStart != null) s.clipStart = t;
-    if (prev) { prev.endTime = fmtTime(t); if (prev.clipEnd != null) prev.clipEnd = t; persistSegment(prev, true); }
-    persistSegment(s, true);
+  function openLyricSync() {
+    const ov = el("overlay"), dr = el("drawer");
+    dr.classList.add("sync-modal");
+    renderLyricSync();
+    ov.classList.add("open"); dr.classList.add("open");
+  }
+  function closeLyricSync() {
+    const ov = el("overlay"), dr = el("drawer");
+    ov.classList.remove("open"); dr.classList.remove("open"); dr.classList.remove("sync-modal");
+    dr.innerHTML = "";
     renderMain();
-    toast("Corte ajustado a " + fmtTime(t));
+  }
+
+  function renderLyricSync() {
+    const dr = el("drawer"); dr.innerHTML = "";
+    const head = h("div", { class: "drawer__head" });
+    head.innerHTML = `<span class="tc">⏱ Sincronizar letra — toda la canción</span>
+      <div class="dh-actions"><button class="close" title="Cerrar">×</button></div>`;
+    head.querySelector(".close").addEventListener("click", closeLyricSync);
+    dr.appendChild(head);
+
+    const body = h("div", { class: "drawer__body sync-body" });
+
+    // Video de la canción completa (rueda libre)
+    const src = fullSongClip();
+    let video = null;
+    if (src) {
+      const vbox = h("div", { class: "sbedit sync-video" });
+      video = h("video", { src, controls: true, preload: "metadata", playsinline: true });
+      vbox.appendChild(video); body.appendChild(vbox);
+      const ph = h("div", { class: "sync-playhead", id: "sync-ph" }, "⏱ 00:00");
+      video.addEventListener("timeupdate", () => { ph.textContent = "⏱ " + fmtTime(video.currentTime || 0); });
+      body.appendChild(ph);
+    } else {
+      body.appendChild(h("div", { class: "beats-hint" }, "No hay video de la canción cargado en ningún bloque."));
+    }
+    body.appendChild(h("div", { class: "beats-hint" }, "Reproducí la canción y cuando empieza cada frase tocá ⏱ en esa línea (o escribí el tiempo). Cada línea se guarda al instante. Cuando termines, tocá «Aplicar a bloques» para que cada frase caiga en su bloque según el tiempo marcado."));
+
+    // Lista completa de líneas (todos los bloques, en orden), agrupada por bloque
+    const segs = sorted();
+    const songAt = () => (video ? (video.currentTime || 0) : null);
+    const list = h("div", { class: "sync-list sync-list-full" });
+    segs.forEach((s) => {
+      const parsed = parseLyric(s.lyric);
+      const hasLyric = isRealLyric(s.lyric);
+      const grp = h("div", { class: "sync-grp" });
+      const title = (s.productionNotes || "").split("—")[0].trim() || s.sectionType || "Bloque";
+      grp.appendChild(h("div", { class: "sync-grp-head" }, `${s.startTime}–${s.endTime} · ${title}` + (hasLyric ? "" : " · (instrumental)")));
+      if (hasLyric) {
+        const save = () => { s.lyric = fmtLyric(parsed); persistSegment(s, true); refreshLyricCell(s); updateSyncCounter(); };
+        parsed.forEach((ln, i) => {
+          if (!ln.text.trim()) return;
+          const r = h("div", { class: "sync-row" });
+          const tin = h("input", { type: "text", class: "sync-t", value: ln.t != null ? fmtTime(ln.t) : "", placeholder: "--:--" });
+          tin.addEventListener("change", () => { const v = tin.value.trim(); parsed[i].t = v ? parseTime(v) : null; save(); });
+          const mark = h("button", { class: "sync-mark", title: "Marcar con el tiempo del video" }, "⏱");
+          if (!video) mark.disabled = true;
+          mark.addEventListener("click", () => { const t = songAt(); if (t == null) return; parsed[i].t = Math.max(0, Math.round(t)); tin.value = fmtTime(parsed[i].t); save(); });
+          r.appendChild(tin); r.appendChild(mark); r.appendChild(h("span", { class: "sync-txt", title: ln.text }, ln.text));
+          grp.appendChild(r);
+        });
+      }
+      list.appendChild(grp);
+    });
+    body.appendChild(list);
+    dr.appendChild(body);
+
+    const foot = h("div", { class: "drawer__actions" });
+    const counter = h("span", { class: "sync-counter", id: "sync-counter" }, "");
+    const apply = h("button", { class: "sync-apply" }, "✓ Aplicar a bloques");
+    apply.addEventListener("click", applyLyricSyncToBlocks);
+    foot.appendChild(counter);
+    foot.appendChild(h("span", { class: "sp" }));
+    foot.appendChild(apply);
+    dr.appendChild(foot);
+    updateSyncCounter();
+  }
+  function updateSyncCounter() {
+    const n = el("sync-counter"); if (!n) return;
+    let synced = 0, total = 0;
+    data.segments.forEach((s) => { const c = lyricSyncCount(s.lyric); synced += c.synced; total += c.total; });
+    n.textContent = `${synced}/${total} líneas marcadas`;
+  }
+
+  // Reasigna cada línea a su bloque según el tiempo marcado y realinea los bordes
+  function applyLyricSyncToBlocks() {
+    const segs = sorted();
+    // 1) juntar TODAS las líneas de todos los bloques, en orden
+    const all = [];
+    segs.forEach((s) => parseLyric(s.lyric).forEach((l) => { if (l.text.trim()) all.push(l); }));
+    const marked = all.filter((l) => l.t != null);
+    if (!marked.length) { toast("Marcá al menos una línea antes de aplicar"); return; }
+    snapshot("aplicar sincronización");
+
+    // 2) nuevos bordes: el inicio de cada bloque con letra = tiempo de su 1ª línea marcada
+    //    Para eso primero repartimos por el reparto actual, pero realineamos bordes por tiempo.
+    // Estrategia: cada bloque que tenga al menos una línea marcada arranca en su primer tiempo marcado.
+    const newStarts = {};
+    segs.forEach((s) => {
+      const first = parseLyric(s.lyric).map((l) => l.t).filter((t) => t != null).sort((a, b) => a - b)[0];
+      if (first != null) newStarts[s.id] = first;
+    });
+    // aplicar nuevos inicios donde corresponda
+    segs.forEach((s) => { if (newStarts[s.id] != null) s.startTime = fmtTime(newStarts[s.id]); });
+    // reordenar y encadenar fines = inicio del siguiente
+    const ordered = sorted();
+    ordered.forEach((s, i) => {
+      s.clipStart = parseTime(s.startTime);
+      if (i < ordered.length - 1) { s.endTime = ordered[i + 1].startTime; s.clipEnd = parseTime(s.endTime); }
+      else { s.clipEnd = parseTime(s.endTime); }
+    });
+    ordered.forEach((s) => persistSegment(s, true));
+    renderLyricSync(); renderMain();
+    toast("Bordes de bloque ajustados a la letra");
   }
 
   function wrapFg(inner) { const w = h("div", { class: "fg" }); w.appendChild(inner); return w; }
@@ -1179,8 +1225,13 @@
   async function boot() {
     // global click closes menu
     document.addEventListener("click", () => { const m = el("menu"); if (m) m.classList.remove("open"); });
-    el("overlay").addEventListener("click", closeDrawer);
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && ui.openId) closeDrawer(); });
+    el("overlay").addEventListener("click", () => {
+      if (el("drawer").classList.contains("sync-modal")) closeLyricSync(); else closeDrawer();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (el("drawer").classList.contains("sync-modal")) closeLyricSync(); else if (ui.openId) closeDrawer();
+    });
 
     if (Sync.init()) {
       try {
