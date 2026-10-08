@@ -374,6 +374,9 @@
     const helpBtn = h("button", { class: "btn-help", title: "Cómo funciona este sitio" }, "? Preguntas frecuentes");
     helpBtn.addEventListener("click", openHelp);
     meta.appendChild(helpBtn);
+    const choreoBtn = h("button", { class: "btn-help btn-choreo", title: "Ver el video de la coreografía" }, "💃 Coreografía");
+    choreoBtn.addEventListener("click", openChoreo);
+    meta.appendChild(choreoBtn);
     host.appendChild(meta);
 
     const right = h("div", { class: "header__meta" });
@@ -422,6 +425,36 @@
   function closeHelp() {
     const ov = el("overlay"), dr = el("drawer");
     ov.classList.remove("open"); dr.classList.remove("open"); dr.classList.remove("help-modal");
+    dr.innerHTML = "";
+  }
+
+  /* ---------- Coreografía (pop-up con video) ---------- */
+  const CHOREO_SRC = "clips/coreo.mp4", CHOREO_IN = 5;
+  function openChoreo() {
+    const ov = el("overlay"), dr = el("drawer");
+    dr.classList.add("choreo-modal");
+    dr.innerHTML = "";
+    const head = h("div", { class: "drawer__head" });
+    head.innerHTML = `<span class="tc">💃 Coreografía</span>
+      <div class="dh-actions"><button class="close" title="Cerrar">×</button></div>`;
+    head.querySelector(".close").addEventListener("click", closeChoreo);
+    dr.appendChild(head);
+    const body = h("div", { class: "drawer__body choreo-body" });
+    const video = h("video", { src: CHOREO_SRC + "#t=" + CHOREO_IN, controls: true, autoplay: true, playsinline: true, preload: "auto" });
+    // arrancar en el segundo 5 (in) de forma robusta
+    let seeded = false;
+    const seekIn = () => { if (seeded) return; try { if ((video.currentTime || 0) < CHOREO_IN) video.currentTime = CHOREO_IN; seeded = true; } catch (e) {} };
+    if (video.readyState >= 1) seekIn(); else video.addEventListener("loadedmetadata", seekIn, { once: true });
+    video.addEventListener("canplay", seekIn, { once: true });
+    video.addEventListener("play", () => { if (!seeded && (video.currentTime || 0) < CHOREO_IN) { try { video.currentTime = CHOREO_IN; } catch (e) {} seeded = true; } }, { once: true });
+    body.appendChild(video);
+    dr.appendChild(body);
+    ov.classList.add("open"); dr.classList.add("open");
+  }
+  function closeChoreo() {
+    const ov = el("overlay"), dr = el("drawer");
+    const v = dr.querySelector("video"); if (v) { try { v.pause(); } catch (e) {} }
+    ov.classList.remove("open"); dr.classList.remove("open"); dr.classList.remove("choreo-modal");
     dr.innerHTML = "";
   }
   const HELP_HTML = `
@@ -1353,6 +1386,7 @@
     el("overlay").addEventListener("click", () => {
       const dr = el("drawer");
       if (dr.classList.contains("help-modal")) closeHelp();
+      else if (dr.classList.contains("choreo-modal")) closeChoreo();
       else if (dr.classList.contains("sync-modal")) closeLyricSync();
       else closeDrawer();
     });
@@ -1360,6 +1394,7 @@
       if (e.key !== "Escape") return;
       const dr = el("drawer");
       if (dr.classList.contains("help-modal")) closeHelp();
+      else if (dr.classList.contains("choreo-modal")) closeChoreo();
       else if (dr.classList.contains("sync-modal")) closeLyricSync();
       else if (ui.openId) closeDrawer();
     });

@@ -350,6 +350,14 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .help-body ul { margin: 0; padding-left: 18px; color: var(--text-2); font-size: 13px; }
 .help-body li { margin: 4px 0; }
 .help-body b { color: var(--text); }
+.btn-choreo:hover { color: var(--accent); }
+
+/* modal de coreografía */
+.drawer.choreo-modal { width: 94vw; max-width: 900px; top: 4vh; height: auto; max-height: 92vh;
+  border-radius: var(--radius); border: 1px solid var(--line-2); }
+.drawer.choreo-modal.open { left: 50%; right: auto; transform: translateX(-50%); }
+.choreo-body { display: flex; align-items: center; justify-content: center; padding: 14px; }
+.choreo-body video { width: 100%; max-height: 78vh; border-radius: var(--radius-s); background: #000; }
 .drawer.sync-modal { width: 94vw; max-width: 760px; top: 3vh; height: 94vh;
   border-radius: var(--radius); border: 1px solid var(--line-2); }
 .drawer.sync-modal.open { left: 50%; right: auto; transform: translateX(-50%); }
