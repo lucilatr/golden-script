@@ -516,7 +516,7 @@
     const list = h("div", { class: "list" });
     const vis = sorted().filter(passes);
     const head = h("div", { class: "row row-head" });
-    head.innerHTML = `<div></div><div>Tiempo</div><div>Letra</div><div>Acción · storyboard</div><div></div>`;
+    head.innerHTML = `<div></div><div>Tiempo</div><div>Letra</div><div>Acción</div><div>Storyboard / clip</div><div></div>`;
     list.appendChild(head);
     if (!vis.length) list.appendChild(h("div", { class: "empty" }, "No hay bloques que coincidan con los filtros."));
     vis.forEach((s) => list.appendChild(buildRowWrap(s)));
@@ -631,6 +631,45 @@
     ta.setSelectionRange(ta.value.length, ta.value.length);
   }
 
+  // Celda de Acción (texto de lo que sucede en escena), editable con doble clic
+  function actCellHTML(s) {
+    const txt = (s.narrativeAction || "").trim();
+    const body = txt
+      ? `<div class="act" title="Doble clic para editar">${esc(txt)}</div>`
+      : '<div class="act muted" title="Doble clic para editar">+ acción</div>';
+    return body + '<button class="act-edit" title="Editar acción acá">✎</button>';
+  }
+  function wireActionCell(row, s) {
+    const cell = row.querySelector(".actioncell");
+    if (!cell) return;
+    const pencil = cell.querySelector(".act-edit");
+    if (pencil) pencil.addEventListener("click", (e) => { e.stopPropagation(); startActionEdit(row, s); });
+    cell.addEventListener("click", (e) => { e.stopPropagation(); });
+    cell.addEventListener("dblclick", (e) => { e.stopPropagation(); startActionEdit(row, s); });
+  }
+  function startActionEdit(row, s) {
+    const cell = row.querySelector(".actioncell");
+    if (!cell || cell.querySelector(".act-edit-ta")) return;
+    const ta = h("textarea", { class: "act-edit-ta", rows: "4" });
+    ta.value = s.narrativeAction || "";
+    cell.innerHTML = "";
+    cell.appendChild(ta);
+    const stop = (e) => e.stopPropagation();
+    ta.addEventListener("click", stop); ta.addEventListener("mousedown", stop);
+    let done = false;
+    const finish = (save) => {
+      if (done) return; done = true;
+      if (save) { s.narrativeAction = ta.value; persistSegment(s, true); }
+      cell.innerHTML = actCellHTML(s); wireActionCell(row, s);
+    };
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ta.blur(); }
+      else if (e.key === "Escape") { e.preventDefault(); done = true; cell.innerHTML = actCellHTML(s); wireActionCell(row, s); }
+    });
+    ta.addEventListener("blur", () => finish(true));
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
   function buildCollapsedRow(s, open) {
     const row = h("div", { class: "row" + (open ? " sel" : ""), style: `--stage-color:${stageColor(s.narrativeStage)}`, "data-seg": s.id });
     const media = s.storyboard
@@ -642,7 +681,8 @@
       <div class="chev">${open ? "▾" : "▸"}</div>
       <div class="tc">${esc(s.startTime)}<small>${esc(s.endTime)} · ${dur(s)}s</small></div>
       <div class="lyriccell">${lyrCellHTML(s)}</div>
-      <div class="actioncol">${media}</div>
+      <div class="actioncell">${actCellHTML(s)}</div>
+      <div class="storycol">${media}</div>
       <div class="right">
         ${(s.beats && s.beats.length) ? `<span class="tap-ind" title="${s.beats.length} momento(s) jugable(s)">⊙${s.beats.length}</span>` : ""}
         ${(s.storyBeat || "").trim() ? '<span class="star-ind" title="Story beat">★</span>' : ""}
@@ -650,11 +690,12 @@
       </div>`;
     row.addEventListener("click", () => toggleRow(s.id));
     wireLyricCell(row, s);
+    wireActionCell(row, s);
     // El área de video reproduce en la lista sin abrir el desplegable
     const vbox = row.querySelector(".sbframe.video");
     if (vbox) vbox.addEventListener("click", (e) => e.stopPropagation());
     const cvid = row.querySelector(".sbframe.video video");
-    if (cvid) { applyClipWindow(cvid, s); attachCutBar(row.querySelector(".actioncol"), cvid, s); }
+    if (cvid) { applyClipWindow(cvid, s); attachCutBar(row.querySelector(".storycol"), cvid, s); }
     return row;
   }
 
@@ -736,8 +777,7 @@
     row2.appendChild(fgSelect(s, "status", "Estado", STATUS));
     colMain.appendChild(wrapFg(row2));
 
-    // Qué vemos (acción en pantalla)
-    colMain.appendChild(fgText(s, "narrativeAction", "Acción — qué sucede en pantalla (no repitas escenario ni momento del día, ya están arriba)"));
+    // (La "Acción" ahora se edita directo en su columna de la planilla, con doble clic)
 
     // Sincronización de letra (colapsado por defecto) + momentos jugables → columna derecha
     if (isRealLyric(s.lyric)) {

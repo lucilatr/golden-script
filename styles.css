@@ -179,7 +179,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .list { margin-top: 6px; }
 .rowwrap { margin-top: 7px; }
 .row {
-  display: grid; grid-template-columns: 26px 92px minmax(150px, 1fr) 340px 46px;
+  display: grid; grid-template-columns: 26px 92px minmax(140px, 1fr) minmax(140px, 1fr) 300px 46px;
   gap: 13px; align-items: center; padding: 12px 14px;
   border: 1px solid var(--line); border-left: 4px solid var(--stage-color, var(--line-2));
   border-radius: var(--radius); background: var(--bg-2); cursor: pointer;
@@ -207,7 +207,25 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   color: var(--text); white-space: pre-line; line-height: 1.5; cursor: text;
 }
 .row .lyr.instrumental { color: var(--text-dim); font-style: italic; font-size: 12px; }
-.row .actioncol { min-width: 0; }
+
+/* celda de Acción (texto editable) */
+.row .actioncell { position: relative; min-width: 0; padding-right: 22px; }
+.row .act { color: var(--text-2); white-space: pre-line; line-height: 1.5; cursor: text; font-size: 12.5px; }
+.row .act.muted { color: var(--text-dim); font-style: italic; }
+.row .act-edit {
+  position: absolute; top: -2px; right: 0; background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 14px; opacity: .5; transition: opacity .12s, color .12s; padding: 2px 4px; line-height: 1;
+}
+.row:hover .act-edit { opacity: .8; }
+.row .act-edit:hover { opacity: 1; color: var(--accent-2); }
+.act-edit-ta {
+  width: 100%; min-height: 72px; background: var(--bg-3); border: 1px solid var(--accent);
+  border-radius: var(--radius-s); padding: 7px 9px; color: var(--text); font-size: 12.5px;
+  line-height: 1.45; resize: vertical; font-family: inherit;
+}
+.act-edit-ta:focus { outline: none; }
+
+.row .storycol { min-width: 0; }
 .row .sbframe {
   position: relative; height: 62px; width: 100%; border-radius: var(--radius-s); overflow: hidden;
   display: flex; align-items: center; justify-content: center;
