@@ -799,9 +799,11 @@
           ? `<div class="sbframe video"><video src="${esc(s.storyboard)}" controls preload="metadata" playsinline></video></div>`
           : `<div class="sbframe has"><img src="${esc(s.storyboard)}" alt="storyboard"></div>`)
       : `<div class="sbframe empty"><span>＋ storyboard / fragmento</span></div>`;
+    const stage = STAGES.find((x) => x.id === s.narrativeStage);
+    const stageTag = stage ? `<span class="stage-tag" style="color:${stage.color};border-color:${stage.color}">${esc(stage.short)}</span>` : "";
     row.innerHTML = `
       <div class="chev">${open ? "▾" : "▸"}</div>
-      <div class="tc">${esc(s.startTime)}<small>${esc(s.endTime)} · ${dur(s)}s</small></div>
+      <div class="tc">${stageTag}<span class="tc-time">${esc(s.startTime)}</span><small>${esc(s.endTime)} · ${dur(s)}s</small></div>
       <div class="lyriccell">${lyrCellHTML(s)}</div>
       <div class="actioncell">${actCellHTML(s)}</div>
       <div class="storycol">${media}</div>
