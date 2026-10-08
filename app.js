@@ -233,6 +233,34 @@
   function persistDelete(id) { touch(); if (Sync.enabled) { Sync.deleteSegment(id); Sync.pushMeta(); } else saveLocal(); refreshUpdated(); }
   function persistBulk() { touch(); if (Sync.enabled) { data.segments.forEach((s) => Sync.pushSegment(s, true)); Sync.pushMeta(); } else saveLocal(); refreshUpdated(); }
 
+  /* ---------------- Undo (historial local de snapshots) ---------------- */
+  const UNDO = [];
+  function snapshot(label) {
+    UNDO.push({ label: label || "cambio", segs: JSON.parse(JSON.stringify(data.segments)) });
+    if (UNDO.length > 30) UNDO.shift();
+    updateUndoBtn();
+  }
+  function undo() {
+    if (!UNDO.length) { toast("Nada para deshacer"); return; }
+    const prev = UNDO.pop();
+    const prevIds = new Set(prev.segs.map((s) => s.id));
+    // borrar los que ahora existen pero no estaban en el snapshot
+    data.segments.forEach((s) => { if (!prevIds.has(s.id)) persistDelete(s.id); });
+    // restaurar los del snapshot
+    data.segments = prev.segs.map(normalizeSeg);
+    data.segments.forEach((s) => (Sync.enabled ? Sync.pushSegment(s, true) : null));
+    if (!Sync.enabled) saveLocal();
+    touch(); refreshUpdated();
+    if (ui.openId && !prevIds.has(ui.openId)) ui.openId = null;
+    renderMain(); updateUndoBtn();
+    toast("Deshecho: " + prev.label);
+  }
+  function updateUndoBtn() {
+    const b = el("undo-btn"); if (!b) return;
+    b.disabled = !UNDO.length;
+    b.title = UNDO.length ? "Deshacer: " + UNDO[UNDO.length - 1].label : "Nada para deshacer";
+  }
+
   /* ---------------- Normalize (migrations) ---------------- */
   function normalizeSeg(s) {
     if (!s) return s;
@@ -333,6 +361,10 @@
     host.appendChild(meta);
 
     const right = h("div", { class: "header__meta" });
+    const undoBtn = h("button", { class: "btn-undo", id: "undo-btn", title: "Deshacer" }, "↶ Deshacer");
+    undoBtn.disabled = !UNDO.length;
+    undoBtn.addEventListener("click", undo);
+    right.appendChild(undoBtn);
     const addBtn = h("button", { class: "btn-add" }, "+ Bloque");
     addBtn.addEventListener("click", addSegment);
     right.appendChild(addBtn);
@@ -698,9 +730,6 @@
     rowCtx.appendChild(fgSelect(s, "timeOfDay", "Momento del día", TOD));
     colMain.appendChild(wrapFg(rowCtx));
 
-    // World
-    colMain.appendChild(wsField(s));
-
     // Stage + status
     const row2 = h("div", { class: "fg-row" });
     row2.appendChild(fgSelect(s, "narrativeStage", "Etapa narrativa", STAGES));
@@ -904,14 +933,14 @@
   function beatsField(s) {
     const d = h("div", { class: "fg beats-fg" });
     d.appendChild(h("label", {}, "Momentos jugables — el tap modifica la acción"));
-    d.appendChild(h("div", { class: "beats-hint" }, "Cada momento: qué nota se tapea y qué pasa según el jugador acierte o falle."));
+    d.appendChild(h("div", { class: "beats-hint" }, "Cada momento: qué nota se tapea y qué pasa en cada resultado — Golden Tap (Perfect), Good y Miss."));
     const list = h("div", { class: "beatlist" });
     (s.beats || []).forEach((b, i) => list.appendChild(beatCard(s, b, i)));
     d.appendChild(list);
     const add = h("button", { class: "beat-add" }, "+ Agregar momento jugable");
     add.addEventListener("click", () => {
       s.beats = s.beats || [];
-      s.beats.push({ cue: "", onHit: "", onMiss: "" });
+      s.beats.push({ cue: "", onPerfect: "", onHit: "", onMiss: "" });
       persistSegment(s, true); renderDrawer(); renderMain();
     });
     d.appendChild(add);
@@ -929,19 +958,18 @@
     c.appendChild(cue);
 
     const io = h("div", { class: "io" });
-    const hit = h("div", { class: "hit" });
-    hit.appendChild(h("label", {}, "Si acertás ✓"));
-    const hitTa = h("textarea", { placeholder: "Salta perfecto y sigue bailando sin perder el flow" });
-    hitTa.value = b.onHit || "";
-    hitTa.addEventListener("input", (e) => { b.onHit = e.target.value; persistSegment(s); });
-    hit.appendChild(hitTa);
-    const miss = h("div", { class: "miss" });
-    miss.appendChild(h("label", {}, "Si fallás ✕"));
-    const missTa = h("textarea", { placeholder: "Salta pero se tropieza y se recupera, retomando la coreografía" });
-    missTa.value = b.onMiss || "";
-    missTa.addEventListener("input", (e) => { b.onMiss = e.target.value; persistSegment(s); });
-    miss.appendChild(missTa);
-    io.appendChild(hit); io.appendChild(miss);
+    const mkState = (cls, label, field, ph) => {
+      const box = h("div", { class: cls });
+      box.appendChild(h("label", {}, label));
+      const ta = h("textarea", { placeholder: ph });
+      ta.value = b[field] || "";
+      ta.addEventListener("input", (e) => { b[field] = e.target.value; persistSegment(s); });
+      box.appendChild(ta);
+      return box;
+    };
+    io.appendChild(mkState("perfect", "Golden Tap · Perfect", "onPerfect", "Ejecución perfecta: efecto dorado, bonus visual, la coreografía llega a su punto máximo"));
+    io.appendChild(mkState("hit", "Good", "onHit", "Acierto correcto: sigue bailando sin perder el flow"));
+    io.appendChild(mkState("miss", "Miss", "onMiss", "Falla: se tropieza levemente y se recupera, retomando la coreografía"));
     c.appendChild(io);
     return c;
   }
@@ -967,6 +995,7 @@
   }
   function duplicateSegment(id) {
     const i = data.segments.findIndex((x) => x.id === id); if (i === -1) return;
+    snapshot("duplicar bloque");
     const clone = JSON.parse(JSON.stringify(data.segments[i])); clone.id = nextId();
     data.segments.push(clone);
     persistSegment(clone, true);
@@ -975,6 +1004,7 @@
   function deleteSegment(id) {
     const s = data.segments.find((x) => x.id === id); if (!s) return;
     if (!confirm(`¿Borrar el bloque ${s.startTime}–${s.endTime}?`)) return;
+    snapshot("borrar bloque");
     data.segments = data.segments.filter((x) => x.id !== id);
     persistDelete(id); closeDrawer(); toast("Bloque borrado");
   }
@@ -984,6 +1014,7 @@
     if (b - a < 2) { toast("Bloque muy corto para dividir"); return; }
     at = Math.round(at);
     if (at <= a || at >= b) { toast("El corte tiene que estar dentro del bloque"); return; }
+    snapshot("dividir bloque");
     const clone = JSON.parse(JSON.stringify(s)); clone.id = nextId();
     clone.startTime = fmtTime(at); clone.endTime = fmtTime(b); clone.storyBeat = "";
     // si hay un video, la segunda mitad arranca desde el punto de corte dentro del clip
@@ -1026,6 +1057,7 @@
   function moveSegment(id, dir) {
     const segs = sorted(); const pos = segs.findIndex((x) => x.id === id); const t = pos + dir;
     if (t < 0 || t >= segs.length) return;
+    snapshot("mover bloque");
     const a = segs[pos], b = segs[t];
     const as = a.startTime, ae = a.endTime; a.startTime = b.startTime; a.endTime = b.endTime; b.startTime = as; b.endTime = ae;
     persistSegment(a, true); persistSegment(b, true);

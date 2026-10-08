@@ -106,6 +106,12 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   padding: 8px 16px; border-radius: 30px; cursor: pointer; letter-spacing: .3px;
 }
 .btn-add:hover { background: var(--accent-2); }
+.btn-undo {
+  background: var(--bg-3); color: var(--text-2); border: 1px solid var(--line-2); font-weight: 600;
+  padding: 8px 14px; border-radius: 30px; cursor: pointer; letter-spacing: .3px;
+}
+.btn-undo:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); border-color: var(--accent); }
+.btn-undo:disabled { opacity: .4; cursor: default; }
 
 /* ---------------- Timeline hero ---------------- */
 .hero { margin: 8px 0 4px; }
@@ -456,16 +462,22 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   border-radius: var(--radius-s); padding: 7px 9px; color: var(--text); font-size: 12.5px;
 }
 .beatcard .bcue:focus { outline: none; border-color: var(--accent); }
-.beatcard .io { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
-.beatcard .io label { font-size: 10px; letter-spacing: .4px; text-transform: uppercase; display: block; margin-bottom: 4px; }
-.beatcard .hit label { color: #7fc9ae; }
-.beatcard .miss label { color: #f3a07f; }
+.beatcard .io { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; margin-top: 9px; }
+@media (max-width: 520px) { .beatcard .io { grid-template-columns: 1fr; } }
+.beatcard .io label { font-size: 10px; letter-spacing: .4px; text-transform: uppercase; display: block; margin-bottom: 4px; font-weight: 700; }
+.beatcard .perfect label { color: #f0c23c; }
+.beatcard .hit label { color: #5fcf8f; }
+.beatcard .miss label { color: #f0685c; }
 .beatcard .io textarea {
-  width: 100%; min-height: 50px; background: var(--bg-3); border: 1px solid var(--line);
+  width: 100%; min-height: 56px; background: var(--bg-3); border: 1px solid var(--line);
   border-radius: var(--radius-s); padding: 7px 9px; color: var(--text); font-size: 12px; line-height: 1.45; resize: vertical;
 }
-.beatcard .hit textarea:focus { outline: none; border-color: #5a8f7b; }
-.beatcard .miss textarea:focus { outline: none; border-color: var(--gp-combat); }
+.beatcard .perfect textarea { border-left: 3px solid #f0c23c; }
+.beatcard .hit textarea { border-left: 3px solid #5fcf8f; }
+.beatcard .miss textarea { border-left: 3px solid #f0685c; }
+.beatcard .perfect textarea:focus { outline: none; border-color: #f0c23c; }
+.beatcard .hit textarea:focus { outline: none; border-color: #5fcf8f; }
+.beatcard .miss textarea:focus { outline: none; border-color: #f0685c; }
 .beat-add {
   margin-top: 10px; width: 100%; background: transparent; border: 1px dashed var(--line-2);
   color: var(--text-2); padding: 9px; border-radius: var(--radius-s); cursor: pointer; font-size: 12px;
