@@ -1044,7 +1044,8 @@
     s.endTime = fmtTime(at);
     data.segments.push(clone);
     persistSegment(s, true); persistSegment(clone, true);
-    openDrawer(clone.id); toast("Bloque dividido en " + fmtTime(at));
+    // los bloques quedan colapsados; para editarlos se despliegan con la flechita
+    renderMain(); toast("Bloque dividido en " + fmtTime(at));
   }
   function splitSegment(id) {
     const s = data.segments.find((x) => x.id === id); if (!s) return;
