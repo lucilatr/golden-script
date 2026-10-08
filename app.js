@@ -243,11 +243,27 @@
   function undo() {
     if (!UNDO.length) { toast("Nada para deshacer"); return; }
     const prev = UNDO.pop();
+    // Los timecodes de letra marcados NO se pierden al deshacer: guardo un mapa
+    // frase→tiempo del estado actual y lo re-aplico a las líneas que coincidan.
+    const timeMap = {};
+    data.segments.forEach((seg) => parseLyric(seg.lyric).forEach((l) => {
+      const k = l.text.trim(); if (l.t != null && k) timeMap[k] = l.t;
+    }));
     const prevIds = new Set(prev.segs.map((s) => s.id));
     // borrar los que ahora existen pero no estaban en el snapshot
     data.segments.forEach((s) => { if (!prevIds.has(s.id)) persistDelete(s.id); });
     // restaurar los del snapshot
     data.segments = prev.segs.map(normalizeSeg);
+    // re-aplicar timecodes marcados a las líneas que coincidan por texto
+    data.segments.forEach((seg) => {
+      if (!isRealLyric(seg.lyric)) return;
+      const parsed = parseLyric(seg.lyric).map((l) => {
+        const k = l.text.trim();
+        if (l.t == null && k && timeMap[k] != null) return { t: timeMap[k], text: l.text };
+        return l;
+      });
+      seg.lyric = fmtLyric(parsed);
+    });
     data.segments.forEach((s) => (Sync.enabled ? Sync.pushSegment(s, true) : null));
     if (!Sync.enabled) saveLocal();
     touch(); refreshUpdated();
