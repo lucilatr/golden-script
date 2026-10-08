@@ -901,16 +901,19 @@
       d.appendChild(h("div", { class: "beats-hint" }, "Este bloque no tiene letra para sincronizar."));
       return d;
     }
-    d.appendChild(h("div", { class: "beats-hint" }, "Reproducí el fragmento y, cuando empieza cada frase, tocá ⏱ en esa línea (o escribí el tiempo). El corte usa estos tiempos para repartir la letra exacto."));
+    d.appendChild(h("div", { class: "beats-hint" }, "Acá el video rueda por TODA la canción (podés marcar aunque la frase caiga cerca de un borde). Cuando empieza cada frase, tocá ⏱ en esa línea (o escribí el tiempo). Después, con «⇄ Ajustar corte» movés el borde del bloque a su 1ª línea."));
     const parsed = parseLyric(s.lyric);
     let video = null, songAt = () => null;
     if (s.storyboard && isVideo(s.storyboard)) {
       const vbox = h("div", { class: "sbedit sync-video" });
       video = h("video", { src: s.storyboard, controls: true, preload: "metadata", playsinline: true });
       vbox.appendChild(video); d.appendChild(vbox);
-      applyClipWindow(video, s);
+      // En sincronización el video NO se limita a la ventana del bloque:
+      // rueda por toda la canción para poder marcar cualquier frase.
+      const seekInit = () => { try { video.currentTime = s.clipStart || parseTime(s.startTime); } catch (e) {} };
+      if (video.readyState >= 1) seekInit(); else video.addEventListener("loadedmetadata", seekInit, { once: true });
       const off = s.clipStart || 0, start = parseTime(s.startTime);
-      songAt = () => start + Math.max(0, (video.currentTime || 0) - off);
+      songAt = () => start + ((video.currentTime || 0) - off); // = tiempo real de canción (clip = canción completa)
       const ph = h("div", { class: "sync-playhead" }, "⏱ " + s.startTime);
       video.addEventListener("timeupdate", () => { ph.textContent = "⏱ " + fmtTime(songAt()); });
       d.appendChild(ph);
@@ -926,12 +929,33 @@
       tin.addEventListener("change", () => { const v = tin.value.trim(); parsed[i].t = v ? parseTime(v) : null; save(); });
       const mark = h("button", { class: "sync-mark", title: "Marcar con el tiempo del video" }, "⏱");
       if (!video) mark.disabled = true;
-      mark.addEventListener("click", () => { const t = songAt(); if (t == null) return; parsed[i].t = Math.round(t); tin.value = fmtTime(parsed[i].t); save(); });
+      mark.addEventListener("click", () => { const t = songAt(); if (t == null) return; parsed[i].t = Math.max(0, Math.round(t)); tin.value = fmtTime(parsed[i].t); save(); });
       r.appendChild(tin); r.appendChild(mark); r.appendChild(h("span", { class: "sync-txt", title: ln.text }, ln.text));
       list.appendChild(r);
     });
     d.appendChild(list);
+    // Ajustar el borde del bloque a su primera línea marcada
+    const snap = h("button", { class: "sync-snap" }, "⇄ Ajustar corte del bloque a la 1ª línea");
+    snap.addEventListener("click", () => snapBlockStartToLyric(s));
+    d.appendChild(snap);
     return d;
+  }
+
+  // Mueve el inicio del bloque (y el fin del anterior) al tiempo de su 1ª línea marcada
+  function snapBlockStartToLyric(s) {
+    const first = parseLyric(s.lyric).find((l) => l.t != null && l.text.trim());
+    if (!first) { toast("Marcá primero el tiempo de la 1ª línea"); return; }
+    const t = first.t, a = parseTime(s.startTime);
+    if (t === a) { toast("El corte ya coincide con la 1ª línea"); return; }
+    snapshot("ajustar corte a letra");
+    const segs = sorted();
+    const idx = segs.findIndex((x) => x.id === s.id);
+    const prev = idx > 0 ? segs[idx - 1] : null;
+    s.startTime = fmtTime(t); if (s.clipStart != null) s.clipStart = t;
+    if (prev) { prev.endTime = fmtTime(t); if (prev.clipEnd != null) prev.clipEnd = t; persistSegment(prev, true); }
+    persistSegment(s, true);
+    renderMain();
+    toast("Corte ajustado a " + fmtTime(t));
   }
 
   function wrapFg(inner) { const w = h("div", { class: "fg" }); w.appendChild(inner); return w; }
