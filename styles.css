@@ -176,6 +176,18 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .filters .count { margin-left: auto; color: var(--text-dim); font-size: 11px; }
 
 /* ---------------- Línea de tiempo gráfica (bandas de etapa + sub-bloques) ---------------- */
+.blocks-toggle-row { margin: 4px 0 14px; display: flex; }
+.blocks-toggle {
+  background: var(--panel, #1b1b22); color: var(--text, #e9e9ef);
+  border: 1px solid var(--border, #33333f); border-radius: 8px;
+  padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  letter-spacing: .3px; transition: background .15s, border-color .15s;
+}
+.blocks-toggle:hover { border-color: var(--accent, #c9a227); }
+.blocks-toggle.on { border-color: var(--accent, #c9a227); }
+.blocks-wrap { animation: blocksIn .18s ease; }
+@keyframes blocksIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
 .htl { margin: 6px 0 18px; }
 .htl-stages { display: flex; gap: 3px; margin-bottom: 5px; }
 .htl-stageband {

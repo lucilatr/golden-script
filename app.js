@@ -147,6 +147,7 @@
   /* ---------------- State ---------------- */
   let data = { meta: seed().meta, segments: [] };
   const ui = { openId: null, openGridId: null, gridAccOpen: false, colorBy: "gameplayMode", showDetails: false, showSync: false, drawerMax: false,
+    showBlocks: false,
     filters: { gameplayMode: "", narrativeStage: "", status: "", location: "" } };
 
   /* ============================================================
@@ -516,8 +517,21 @@
     const tl = h("div", { id: "tl" });
     host.appendChild(tl);
     renderGrid(tl);
-    renderFilters(host);
-    renderList(host);
+
+    // Botón para mostrar/ocultar los bloques de abajo (ocultos por default)
+    const toggleRow = h("div", { class: "blocks-toggle-row" });
+    const tgl = h("button", { class: "blocks-toggle" + (ui.showBlocks ? " on" : "") },
+      ui.showBlocks ? "▾ Ocultar bloques" : "▸ Mostrar bloques");
+    tgl.addEventListener("click", () => { ui.showBlocks = !ui.showBlocks; renderMain(); });
+    toggleRow.appendChild(tgl);
+    host.appendChild(toggleRow);
+
+    if (ui.showBlocks) {
+      const blocks = h("div", { class: "blocks-wrap" });
+      host.appendChild(blocks);
+      renderFilters(blocks);
+      renderList(blocks);
+    }
   }
   // Refresca sólo la grilla superior, sin tocar la lista ni el editor inline
   function refreshTimeline() {
@@ -679,7 +693,7 @@
     const wrap = h("div", { class: "filters" });
     const addSel = (key, list, empty) => {
       const s = h("select", { "data-f": key }); s.innerHTML = opts(list, f[key], empty);
-      s.addEventListener("change", (e) => { f[key] = e.target.value; renderList(el("main")); updateCount(); });
+      s.addEventListener("change", (e) => { f[key] = e.target.value; renderList(document.querySelector(".blocks-wrap") || el("main")); updateCount(); });
       wrap.appendChild(s);
     };
     addSel("gameplayMode", GP, "Todo gameplay");
@@ -915,12 +929,14 @@
   function toggleRow(id) {
     ui.openId = (ui.openId === id) ? null : id;
     ui.showDetails = false; ui.showSync = false;
+    if (ui.openId) ui.showBlocks = true;   // al abrir un bloque, mostrar la lista de abajo
     renderMain();
     if (ui.openId) scrollToRow(ui.openId, "nearest");
   }
   // alias usados por timeline / CRUD para expandir una fila concreta
   function openDrawer(id) {
     ui.openId = id; ui.showDetails = false; ui.showSync = false;
+    ui.showBlocks = true;   // al abrir un bloque desde la timeline, mostrar la lista
     renderMain();
     scrollToRow(id, "center");
   }
