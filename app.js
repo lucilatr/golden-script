@@ -147,7 +147,7 @@
   /* ---------------- State ---------------- */
   let data = { meta: seed().meta, segments: [] };
   const ui = { openId: null, openGridId: null, gridAccOpen: false, colorBy: "gameplayMode", showDetails: false, showSync: false, drawerMax: false,
-    showBlocks: false,
+    showBlocks: false, wfZoom: 1,
     filters: { gameplayMode: "", narrativeStage: "", status: "", location: "" } };
 
   /* ============================================================
@@ -514,6 +514,9 @@
   /* ---------- Main (hero + strip + filters + list) ---------- */
   function renderMain() {
     const host = el("main"); host.innerHTML = "";
+    const wf = h("div", { id: "wf-host" });
+    host.appendChild(wf);
+    renderWaveform(wf);
     const tl = h("div", { id: "tl" });
     host.appendChild(tl);
     renderGrid(tl);
@@ -589,6 +592,15 @@
       grid.appendChild(cell(3, "htl-c-ui", "UI", "interaction", s.interaction));
       grid.appendChild(cell(4, "htl-c-esc", "Escenario", "location", s.location));
       grid.appendChild(cell(5, "htl-c-acc", "Acción", "narrativeAction", s.narrativeAction));
+
+      // Fila 6: Letra (según el tiempo). Solo lectura; click abre «Sincronizar letra».
+      const lyLines = parseLyric(s.lyric).filter((l) => l.text.trim());
+      const lyHtml = isRealLyric(s.lyric)
+        ? lyLines.map((l) => `<span class="htl-ly-line">${l.t != null ? `<em>${fmtTime(l.t)}</em> ` : ""}${esc(l.text)}</span>`).join("")
+        : `<span class="htl-c-muted">(instrumental)</span>`;
+      const lc = h("div", { class: "htl-cell htl-c-letra", style: `grid-column:${col};grid-row:6`, "data-seg": s.id });
+      lc.innerHTML = `<span class="htl-c-k">Letra <span class="htl-ly-edit" title="Sincronizar / editar letra">⏱</span></span><span class="htl-c-v htl-ly">${lyHtml}</span>`;
+      grid.appendChild(lc);
     });
 
     scroll.appendChild(grid);
@@ -596,6 +608,7 @@
     host.appendChild(wrap);
 
     grid.querySelectorAll(".htl-c-time").forEach((c) => c.addEventListener("click", () => openDrawer(c.getAttribute("data-seg"))));
+    grid.querySelectorAll(".htl-c-letra").forEach((c) => c.addEventListener("click", () => openLyricSync()));
     grid.querySelectorAll(".hplay").forEach((b) => b.addEventListener("click", (e) => {
       e.stopPropagation();
       playRange(b.getAttribute("data-play"), +b.getAttribute("data-s"), +b.getAttribute("data-e"));
@@ -1100,6 +1113,108 @@
   // Fuente de audio: la canción real del juego (3:14), ya sincronizada con los timecodes
   const SONG_AUDIO = "clips/song.m4a";
   let songAudio = null, playingKey = null, playStop = null, playProg = null;
+  // ---- Waveform (arriba de la timeline) ----
+  const WF = { peaks: null, duration: 0, pps: 15 };   // pps = px por segundo a 1x (igual que la timeline)
+  let wfRaf = null, wfLoading = null;
+  function wfScale() { return WF.pps * ui.wfZoom; }
+  function wfLoad() {
+    if (WF.peaks) return Promise.resolve(true);
+    if (wfLoading) return wfLoading;
+    wfLoading = fetch("clips/waveform.json?v=1").then((r) => r.json()).then((j) => {
+      WF.peaks = j.peaks; WF.duration = j.duration; return true;
+    }).catch(() => false);
+    return wfLoading;
+  }
+  function wfDraw(canvas) {
+    if (!WF.peaks) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.round(WF.duration * wfScale()), H = 70;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    const peaks = WF.peaks, N = peaks.length, mid = H / 2;
+    const barW = Math.max(1, (W / N) * 0.72);
+    ctx.fillStyle = "#4a4a57";
+    for (let i = 0; i < N; i++) {
+      const x = (i / N) * W;
+      const hh = Math.max(1, peaks[i] * mid * 0.92);
+      ctx.fillRect(x, mid - hh, barW, hh * 2);
+    }
+  }
+  function wfApplyPositions() {
+    const sc = wfScale();
+    const a = songAudio;
+    const x = a ? (a.currentTime || 0) * sc : 0;
+    const ph = document.querySelector(".wf-playhead"), played = document.querySelector(".wf-played");
+    if (ph) ph.style.left = x + "px";
+    if (played) played.style.width = x + "px";
+  }
+  function wfShowRegion(start, end) {
+    const region = document.querySelector(".wf-region"); if (!region) return;
+    if (start == null) { region.style.display = "none"; return; }
+    const sc = wfScale();
+    region.style.display = "block";
+    region.style.left = (start * sc) + "px";
+    region.style.width = Math.max(2, (end - start) * sc) + "px";
+  }
+  function wfLoop() {
+    const a = songAudio;
+    const ph = document.querySelector(".wf-playhead"), played = document.querySelector(".wf-played"), scroll = document.querySelector(".wf-scroll");
+    if (ph && a) {
+      const x = (a.currentTime || 0) * wfScale();
+      ph.style.left = x + "px";
+      if (played) played.style.width = x + "px";
+      if (scroll) {
+        const v0 = scroll.scrollLeft, v1 = v0 + scroll.clientWidth;
+        if (x < v0 + 40 || x > v1 - 40) scroll.scrollLeft = x - scroll.clientWidth * 0.5;
+      }
+    }
+    wfRaf = requestAnimationFrame(wfLoop);
+  }
+  function wfStart() { if (!wfRaf) wfRaf = requestAnimationFrame(wfLoop); }
+  function wfStop() { if (wfRaf) { cancelAnimationFrame(wfRaf); wfRaf = null; } }
+  function playFull(time) { playRange("wf", time, WF.duration || 999); }
+  function renderWaveform(host) {
+    const wrap = h("div", { class: "wf" });
+    const head = h("div", { class: "wf-head" });
+    head.innerHTML = `<span class="wf-label">▶ WAVEFORM — click en la onda para reproducir desde ese punto</span>`;
+    const zoom = h("div", { class: "wf-zoom" });
+    const bOut = h("button", { title: "Alejar (estrechar)" }, "−");
+    const zlbl = h("span", { class: "wf-zoom-lbl" }, ui.wfZoom.toFixed(1).replace(/\.0$/, "") + "×");
+    const bIn = h("button", { title: "Acercar (estirar)" }, "+");
+    zoom.append(bOut, zlbl, bIn); head.appendChild(zoom); wrap.appendChild(head);
+
+    const scroll = h("div", { class: "wf-scroll" });
+    const cw = h("div", { class: "wf-canvaswrap" });
+    const canvas = h("canvas", { class: "wf-canvas" });
+    const played = h("div", { class: "wf-played" });
+    const region = h("div", { class: "wf-region" });
+    const ph = h("div", { class: "wf-playhead" });
+    cw.append(canvas, played, region, ph);
+    scroll.appendChild(cw); wrap.appendChild(scroll); host.appendChild(wrap);
+
+    const redraw = () => {
+      const W = Math.round(WF.duration * wfScale());
+      cw.style.width = W + "px";
+      wfDraw(canvas);
+      wfApplyPositions();
+      // mantener la región de la etapa/bloque que esté sonando
+      const b = playingKey && playingKey !== "wf" && document.querySelector(`.hplay[data-play="${playingKey}"]`);
+      if (b) wfShowRegion(+b.getAttribute("data-s"), +b.getAttribute("data-e")); else wfShowRegion(null);
+      zlbl.textContent = ui.wfZoom.toFixed(1).replace(/\.0$/, "") + "×";
+    };
+    bIn.addEventListener("click", () => { ui.wfZoom = Math.min(6, ui.wfZoom * 1.5); redraw(); });
+    bOut.addEventListener("click", () => { ui.wfZoom = Math.max(0.5, ui.wfZoom / 1.5); redraw(); });
+    cw.addEventListener("click", (e) => {
+      const rect = cw.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const time = Math.max(0, x / wfScale());
+      playFull(time);
+    });
+
+    wfLoad().then((ok) => { if (!ok) { wrap.style.display = "none"; return; } redraw(); });
+  }
   // Resetea las barras de progreso y los contadores a su valor por defecto
   function resetProgress() {
     document.querySelectorAll(".htl-prog > i").forEach((i) => { i.style.width = "0%"; });
@@ -1121,6 +1236,7 @@
       if (playProg) songAudio.removeEventListener("timeupdate", playProg);
     }
     playStop = null; playProg = null; playingKey = null;
+    wfStop(); wfShowRegion(null);
     resetProgress(); updatePlayButtons();
   }
   // Reproduce un rango [start, end] (segundos) de la canción; `key` identifica qué botón suena
@@ -1129,6 +1245,8 @@
     if (playingKey === key && !a.paused) { stopSong(); return; } // toggle off
     stopSong();
     playingKey = key; updatePlayButtons();
+    wfStart();
+    wfShowRegion(key === "wf" ? null : start, end);
     const total = Math.max(0.1, end - start);
     const playFrom = () => {
       playStop = () => { if ((a.currentTime || 0) >= end) stopSong(); };
@@ -1262,19 +1380,14 @@
 
     const body = h("div", { class: "drawer__body sync-body" });
 
-    // Video de la canción completa (rueda libre)
-    const src = fullSongClip();
-    let video = null;
-    if (src) {
-      const vbox = h("div", { class: "sbedit sync-video" });
-      video = h("video", { src, controls: true, preload: "metadata", playsinline: true });
-      vbox.appendChild(video); body.appendChild(vbox);
-      const ph = h("div", { class: "sync-playhead", id: "sync-ph" }, "⏱ 00:00");
-      video.addEventListener("timeupdate", () => { ph.textContent = "⏱ " + fmtTime(video.currentTime || 0); });
-      body.appendChild(ph);
-    } else {
-      body.appendChild(h("div", { class: "beats-hint" }, "No hay video de la canción cargado en ningún bloque."));
-    }
+    // Audio real de la canción (3:14) para sincronizar. El video, en negro por ahora.
+    const vbox = h("div", { class: "sbedit sync-video" });
+    vbox.appendChild(h("div", { class: "sync-blackvideo" }, "🎬 Video — en negro por ahora"));
+    const video = h("audio", { src: SONG_AUDIO, controls: true, preload: "metadata" }); // `video` = reproductor (los ⏱ leen su currentTime)
+    vbox.appendChild(video); body.appendChild(vbox);
+    const ph = h("div", { class: "sync-playhead", id: "sync-ph" }, "⏱ 00:00");
+    video.addEventListener("timeupdate", () => { ph.textContent = "⏱ " + fmtTime(video.currentTime || 0); });
+    body.appendChild(ph);
     body.appendChild(h("div", { class: "beats-hint" }, "Reproducí la canción y cuando empieza cada frase tocá ⏱ en esa línea (o escribí el tiempo). Cada línea se guarda al instante. Cuando termines, tocá «Aplicar a bloques» para que cada frase caiga en su bloque según el tiempo marcado."));
 
     // Lista completa de líneas (todos los bloques, en orden), agrupada por bloque
