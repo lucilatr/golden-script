@@ -194,8 +194,9 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   min-width: 0; overflow: hidden; padding: 7px 4px; border-radius: 5px; white-space: nowrap;
 }
 .htl-cell { min-width: 0; background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px; padding: 7px 9px; overflow: hidden; }
-.htl-c-time { border-top: 3px solid var(--c); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.htl-c-time { border-top: 3px solid var(--c); cursor: pointer; display: flex; align-items: center; gap: 7px; }
 .htl-c-time:hover { background: var(--bg-hover); }
+.hplay-block { width: 20px; height: 20px; font-size: 9px; }
 .htl-b-time { font-family: var(--mono); font-size: 13px; color: var(--text); }
 .htl-c-time small { color: var(--text-dim); font-size: 10px; }
 .htl-c-k { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-dim); font-weight: 700; margin-bottom: 3px; }

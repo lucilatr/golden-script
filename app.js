@@ -559,7 +559,8 @@
       const stage = STAGES.find((x) => x.id === s.narrativeStage);
       const col = idx + 1;
       const t = h("div", { class: "htl-cell htl-c-time", style: `grid-column:${col};grid-row:2;--c:${stage ? stage.color : "var(--line-2)"}`, "data-seg": s.id });
-      t.innerHTML = `<span class="htl-b-time">${esc(s.startTime)}</span><small>${esc(s.endTime)} · ${dur(s)}s</small>`;
+      t.innerHTML = `<button class="hplay hplay-block" data-play="${s.id}" data-s="${parseTime(s.startTime)}" data-e="${parseTime(s.endTime)}" title="Escuchar este momento">▶</button>` +
+        `<span class="htl-b-time">${esc(s.startTime)}</span><small>${esc(s.endTime)} · ${dur(s)}s</small>`;
       grid.appendChild(t);
       const cell = (row, cls, k, field, v) => {
         const c = h("div", { class: "htl-cell " + cls, style: `grid-column:${col};grid-row:${row}`, "data-seg": s.id, "data-field": field });
@@ -1162,14 +1163,20 @@
     rec.lang = "es-ES"; rec.interimResults = true; rec.continuous = true;
     // arranca del texto actual: así podés AGREGAR, o decir "borrar" para limpiar y dictar de nuevo
     let base = (s[field] || "").trim();
-    const CLEAR = /^(borr[aá](r|lo|rlo)?|limpi(ar|á|a))( (el )?(texto|todo))?$/i;
-    const norm = (t) => t.trim().replace(/[.,!?;:]+$/g, "").trim();
+    // comando "borrar/eliminar/limpiar (todo) (el texto)…" → detecta el verbo quitando relleno
+    const CLEAR = /^(borr(a|á|o|ar|arlo|alo|álo)|elimin(a|á|o|ar|arlo|alo)|limpi(a|á|o|ar|arlo|alo))$/;
+    const isClear = (t) => {
+      const c = t.toLowerCase().replace(/[.,!?¡¿;:]/g, " ")
+        .replace(/\b(el|la|lo|los|las|todo|toda|todos|todas|texto|contenido|completo|completa|esto|eso|por favor|porfa|ahora|ya)\b/g, "")
+        .replace(/\s+/g, " ").trim();
+      return CLEAR.test(c);
+    };
     rec.onresult = (e) => {
       let interim = "";
       for (let k = e.resultIndex; k < e.results.length; k++) {
         const t = e.results[k][0].transcript;
         if (e.results[k].isFinal) {
-          if (CLEAR.test(norm(t))) { base = ""; toast("🧹 Texto borrado — seguí dictando"); }
+          if (isClear(t)) { base = ""; toast("🧹 Texto borrado — seguí dictando"); }
           else base = (base ? base + " " : "") + t.trim();
         } else interim += t;
       }
