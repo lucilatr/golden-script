@@ -202,11 +202,21 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .htl-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; }
 .htl-grid2 { display: grid; column-gap: 3px; row-gap: 3px; width: max-content; align-items: stretch; }
 .htl-band2 {
+  position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-width: 0; overflow: hidden; padding: 7px 4px; border-radius: 5px; white-space: nowrap;
 }
 .htl-cell { min-width: 0; background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px; padding: 7px 9px; overflow: hidden; }
-.htl-c-time { border-top: 3px solid var(--c); cursor: pointer; display: flex; align-items: center; gap: 7px; }
+.htl-c-time { position: relative; border-top: 3px solid var(--c); cursor: pointer; display: flex; align-items: center; gap: 7px; }
+
+/* Barra de progreso al reproducir un tramo (se llena 0 → 100%) */
+.htl-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.12); border-radius: 0 0 5px 5px; overflow: hidden; pointer-events: none; }
+.htl-prog > i { display: block; height: 100%; width: 0%; background: var(--accent, #c9a227); transition: width .12s linear; }
+.htl-band2 .htl-prog { background: rgba(0,0,0,.22); }
+.htl-band2 .htl-prog > i { background: currentColor; }
+/* Contador de tiempo transcurrido mientras suena */
+.htl-count.counting { color: var(--accent, #c9a227); font-weight: 700; }
+.htl-sb-dur.htl-count.counting { color: inherit; }
 .htl-c-time:hover { background: var(--bg-hover); }
 .hplay-block { width: 20px; height: 20px; font-size: 9px; }
 .htl-b-time { font-family: var(--mono); font-size: 13px; color: var(--text); }

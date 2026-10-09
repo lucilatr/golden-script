@@ -564,7 +564,9 @@
       const b = h("div", { class: "htl-band2", style: `grid-column:${i + 1} / span ${j - i};grid-row:1;background:${stage ? stage.color : "var(--line-2)"};color:${stage && stage.id === "golden" ? "#241a05" : "#fff"}` });
       b.innerHTML =
         `<div class="htl-sb-top"><button class="hplay hplay-stage" data-play="stage-${gi}" data-s="${gStart}" data-e="${gEnd}" title="Escuchar toda la etapa">▶</button>` +
-        `<span class="htl-sb-dur">${w}s</span></div><span class="htl-sb-name">${stage ? esc(stage.short) : ""}</span>`;
+        `<span class="htl-sb-dur htl-count" data-count="stage-${gi}" data-rest="${w}s">${w}s</span></div>` +
+        `<span class="htl-sb-name">${stage ? esc(stage.short) : ""}</span>` +
+        `<span class="htl-prog" data-prog="stage-${gi}"><i></i></span>`;
       grid.appendChild(b); i = j; gi++;
     }
 
@@ -574,7 +576,9 @@
       const col = idx + 1;
       const t = h("div", { class: "htl-cell htl-c-time", style: `grid-column:${col};grid-row:2;--c:${stage ? stage.color : "var(--line-2)"}`, "data-seg": s.id });
       t.innerHTML = `<button class="hplay hplay-block" data-play="${s.id}" data-s="${parseTime(s.startTime)}" data-e="${parseTime(s.endTime)}" title="Escuchar este momento">▶</button>` +
-        `<span class="htl-b-time">${esc(s.startTime)}</span><small>${esc(s.endTime)} · ${dur(s)}s</small>`;
+        `<span class="htl-b-time">${esc(s.startTime)}</span>` +
+        `<small class="htl-count" data-count="${s.id}" data-rest="${esc(s.endTime)} · ${dur(s)}s">${esc(s.endTime)} · ${dur(s)}s</small>` +
+        `<span class="htl-prog" data-prog="${s.id}"><i></i></span>`;
       grid.appendChild(t);
       const cell = (row, cls, k, field, v) => {
         const c = h("div", { class: "htl-cell " + cls, style: `grid-column:${col};grid-row:${row}`, "data-seg": s.id, "data-field": field });
@@ -1095,7 +1099,12 @@
   /* ---- Reproducir SÓLO el audio del tramo de un bloque (uno por vez) ---- */
   // Fuente de audio: la canción real del juego (3:14), ya sincronizada con los timecodes
   const SONG_AUDIO = "clips/song.m4a";
-  let songAudio = null, playingKey = null, playStop = null;
+  let songAudio = null, playingKey = null, playStop = null, playProg = null;
+  // Resetea las barras de progreso y los contadores a su valor por defecto
+  function resetProgress() {
+    document.querySelectorAll(".htl-prog > i").forEach((i) => { i.style.width = "0%"; });
+    document.querySelectorAll(".htl-count").forEach((c) => { c.textContent = c.getAttribute("data-rest") || c.textContent; c.classList.remove("counting"); });
+  }
   function getSongAudio() {
     if (!songAudio) {
       songAudio = document.createElement("audio");
@@ -1106,8 +1115,13 @@
     return songAudio;
   }
   function stopSong() {
-    if (songAudio) { try { songAudio.pause(); } catch (e) {} if (playStop) songAudio.removeEventListener("timeupdate", playStop); }
-    playStop = null; playingKey = null; updatePlayButtons();
+    if (songAudio) {
+      try { songAudio.pause(); } catch (e) {}
+      if (playStop) songAudio.removeEventListener("timeupdate", playStop);
+      if (playProg) songAudio.removeEventListener("timeupdate", playProg);
+    }
+    playStop = null; playProg = null; playingKey = null;
+    resetProgress(); updatePlayButtons();
   }
   // Reproduce un rango [start, end] (segundos) de la canción; `key` identifica qué botón suena
   function playRange(key, start, end) {
@@ -1115,9 +1129,22 @@
     if (playingKey === key && !a.paused) { stopSong(); return; } // toggle off
     stopSong();
     playingKey = key; updatePlayButtons();
+    const total = Math.max(0.1, end - start);
     const playFrom = () => {
       playStop = () => { if ((a.currentTime || 0) >= end) stopSong(); };
       a.addEventListener("timeupdate", playStop);
+      // Progreso: barra que se llena + contador de tiempo transcurrido (0 → total)
+      playProg = () => {
+        const elapsed = Math.max(0, Math.min(total, (a.currentTime || 0) - start));
+        const pct = (elapsed / total) * 100;
+        document.querySelectorAll(`[data-prog="${key}"] > i`).forEach((i) => { i.style.width = pct + "%"; });
+        document.querySelectorAll(`[data-count="${key}"]`).forEach((c) => {
+          c.classList.add("counting");
+          c.textContent = `⏱ ${Math.round(elapsed)}s / ${Math.round(total)}s`;
+        });
+      };
+      a.addEventListener("timeupdate", playProg);
+      playProg();
       const p = a.play();
       if (p && p.catch) p.catch(() => { stopSong(); toast("No se pudo reproducir el audio"); });
     };
