@@ -73,7 +73,7 @@
       location: "Seoul Streets", timeOfDay: "night", narrativeAction: "", characterAction: "",
       camera: "", gameplayMode: "frontal", playerAction: "", environmentInteraction: "",
       worldState: "normal", visualFX: "", transition: "", productionNotes: "", storyBeat: "", status: "idea",
-      sectionType: "", storyboard: "",
+      sectionType: "", storyboard: "", interaction: "",
     };
     const mk = (id, a, b, over) => {
       const s = Object.assign({ id, startTime: a, endTime: b }, base, over);
@@ -146,7 +146,7 @@
 
   /* ---------------- State ---------------- */
   let data = { meta: seed().meta, segments: [] };
-  const ui = { openId: null, colorBy: "gameplayMode", showDetails: false, showSync: false, drawerMax: false,
+  const ui = { openId: null, openGridId: null, gridAccOpen: false, colorBy: "gameplayMode", showDetails: false, showSync: false, drawerMax: false,
     filters: { gameplayMode: "", narrativeStage: "", status: "", location: "" } };
 
   /* ============================================================
@@ -286,6 +286,7 @@
     if (s.storyboard == null) s.storyboard = "";
     if (s.clipStart == null) s.clipStart = 0;
     if (s.clipEnd == null) s.clipEnd = 0;
+    if (s.interaction == null) s.interaction = "";
     return s;
   }
   function normalizeAll() { data.segments.forEach(normalizeSeg); }
@@ -462,34 +463,22 @@
 
     <h3>La pantalla</h3>
     <ul>
-      <li><b>Arriba:</b> la línea de tiempo de la canción.</li>
-      <li><b>Abajo:</b> la planilla, un bloque por sección, en columnas <b>Tiempo · Letra · Acción · Storyboard/clip</b>.</li>
+      <li><b>Arriba — Línea de tiempo por etapa:</b> una grilla con la canción dividida en los 3 actos de la historia (<b style="color:#8098c8">Deseo</b> → <b style="color:#c56ab0">Transformación</b> → <b style="color:#e0b44e">Consagración</b>), y dentro, las secciones de cada momento. El ancho es proporcional al tiempo (se puede scrollear a la derecha).</li>
+      <li>Cada sección muestra, en filas: <b>Tiempo · UI · Escenario · Acción</b>.</li>
+      <li><b>Abajo — Planilla:</b> el detalle completo de cada bloque (letra, storyboard/clip, gameplay, momento del día, estado, momentos jugables, timecodes).</li>
     </ul>
 
-    <h3>Editar en la planilla</h3>
+    <h3>Escuchar la música</h3>
     <ul>
-      <li><b>Doble clic</b> en la <b>Letra</b> o en la <b>Acción</b> para escribir ahí mismo (o el lapicito ✎). Se guarda al salir; <b>Esc</b> cancela.</li>
-      <li>La flechita <b>▸</b> despliega el bloque para ver/editar el detalle: escenario, momento del día, gameplay, etapa narrativa, estado, momentos jugables y timecodes.</li>
+      <li>En la banda de cada etapa hay un <b>▶</b> que reproduce <b>sólo ese tramo</b> de la canción real (sin video). Suena una etapa a la vez; tocás de nuevo para pausar.</li>
     </ul>
 
-    <h3>Storyboard / clip</h3>
+    <h3>Editar los slots (UI · Escenario · Acción)</h3>
     <ul>
-      <li>Cada bloque muestra su fragmento de video; se reproduce ahí mismo (no abre el desplegable).</li>
-      <li>En el desplegable podés subir una imagen o pegar una URL (imagen o video).</li>
-    </ul>
-
-    <h3>Cortar bloques (tipo Premiere)</h3>
-    <ul>
-      <li>Reproducís el clip del bloque, lo pausás donde querés y tocás <b>✂ Cortar</b>: el bloque se divide en dos en ese punto, repartiendo la letra y el video.</li>
-      <li>El bloque nuevo queda colapsado; lo abrís con la flechita.</li>
-      <li>También hay <b>✂ Dividir bloque</b> (por tiempo escrito) dentro del desplegable.</li>
-    </ul>
-
-    <h3>Sincronizar la letra</h3>
-    <ul>
-      <li>Botón <b>⏱ Sincronizar letra</b> (arriba): abre un panel con el video de toda la canción y <b>todas las frases en orden</b>. Reproducís y tocás <b>⏱</b> en cada línea cuando entra (o escribís el tiempo). Se guarda al instante.</li>
-      <li><b>Aplicar a bloques</b> ajusta los bordes de cada bloque según los tiempos marcados.</li>
-      <li>En cada bloque, dentro de <b>⏱ Timecodes de la letra</b>, podés tocar <b>⇄ Ajustar inicio del bloque a la 1ª línea</b>.</li>
+      <li><b>Doble clic</b> sobre el texto de un slot → se abre un campo para escribir a mano. Guarda al salir (o <b>Cmd/Ctrl+Enter</b>); <b>Esc</b> cancela.</li>
+      <li><b>🎤 Dictado por voz</b> (en Chrome/Edge): tocás el micrófono del slot y hablás — el texto se agrega. Tocás el 🎤 de nuevo para terminar.</li>
+      <li><b>Comando de voz "borrar":</b> con el 🎤 activo, decí <b>"borrar"</b> (o "limpiar") para vaciar el slot y dictar el texto nuevo.</li>
+      <li>Click en el <b>tiempo</b> de una sección → abre ese bloque en la planilla de abajo para editar todo el detalle.</li>
     </ul>
 
     <h3>Momentos jugables</h3>
@@ -497,16 +486,27 @@
       <li>Por cada tap se describe qué pasa en los tres resultados: <b style="color:#f0c23c">Golden</b> (perfect), <b style="color:#5fcf8f">Good</b> y <b style="color:#f0685c">Miss</b>.</li>
     </ul>
 
+    <h3>Storyboard / clip (en la planilla)</h3>
+    <ul>
+      <li>Cada bloque puede tener un fragmento de video o una imagen; se reproduce ahí mismo. Podés subir una imagen o pegar una URL.</li>
+    </ul>
+
+    <h3>Cortar bloques (tipo Premiere)</h3>
+    <ul>
+      <li>En la planilla, reproducís el clip del bloque, lo pausás y tocás <b>✂ Cortar</b>: el bloque se divide en dos en ese punto, repartiendo la letra y el video.</li>
+      <li>También hay <b>✂ Dividir bloque</b> por tiempo escrito (MM:SS).</li>
+    </ul>
+
+    <h3>Sincronizar la letra</h3>
+    <ul>
+      <li>Botón <b>⏱ Sincronizar letra</b> (arriba): abre un panel con la canción completa y <b>todas las frases en orden</b>. Reproducís y tocás <b>⏱</b> en cada línea cuando entra (o escribís el tiempo). Se guarda al instante.</li>
+      <li><b>Aplicar a bloques</b> ajusta los bordes de cada bloque según los tiempos marcados.</li>
+    </ul>
+
     <h3>Deshacer y guardado</h3>
     <ul>
       <li><b>↶ Deshacer</b> revierte cortes y cambios de bloque, <b>sin perder los timecodes</b> ya marcados.</li>
       <li>Todo se guarda solo en la nube (en vivo, compartido). No hace falta "guardar".</li>
-    </ul>
-
-    <h3>Línea de tiempo</h3>
-    <ul>
-      <li>Podés colorearla por Gameplay, Sección, Etapa, Mundo o Locación con los botones de arriba.</li>
-      <li>Click en un bloque de la barra salta a editarlo.</li>
     </ul>`;
   function refreshUpdated() { const n = el("m-upd"); if (n) n.textContent = fmtDate(data.meta.lastUpdated); }
 
@@ -515,17 +515,81 @@
     const host = el("main"); host.innerHTML = "";
     const tl = h("div", { id: "tl" });
     host.appendChild(tl);
-    renderHero(tl);
-    renderGpStrip(tl);
+    renderGrid(tl);
     renderFilters(host);
     renderList(host);
   }
-  // Refresca sólo el timeline (hero + strip), sin tocar la lista ni el editor inline
+  // Refresca sólo la grilla superior, sin tocar la lista ni el editor inline
   function refreshTimeline() {
     const tl = el("tl"); if (!tl) return;
     tl.innerHTML = "";
-    renderHero(tl);
-    renderGpStrip(tl);
+    renderGrid(tl);
+  }
+
+  // Grilla horizontal (guion tipo línea de tiempo): secciones en columnas, dimensiones en filas
+  // Línea de tiempo: una sola grilla (bandas de etapa que abarcan sus bloques + info inline)
+  function renderGrid(host) {
+    const segs = sorted();
+    const SCALE = 15; // px por segundo → proporciones exactas; se extiende a la derecha (scroll)
+    const wrap = h("div", { class: "htl" });
+    wrap.appendChild(h("div", { class: "seglabel", style: "margin-bottom:8px" },
+      "Línea de tiempo — ▶ escucha la etapa · click en el tiempo para editar el bloque"));
+
+    const scroll = h("div", { class: "htl-scroll" });
+    const grid = h("div", { class: "htl-grid2" });
+    grid.style.gridTemplateColumns = segs.map((s) => `${Math.max(1, dur(s)) * SCALE}px`).join(" ");
+
+    // Fila 1: bandas de etapa, abarcando (span) las columnas de sus bloques
+    let i = 0, gi = 0;
+    while (i < segs.length) {
+      let j = i, w = 0; const st = segs[i].narrativeStage;
+      const gStart = parseTime(segs[i].startTime);
+      while (j < segs.length && segs[j].narrativeStage === st) { w += dur(segs[j]); j++; }
+      const gEnd = parseTime(segs[j - 1].endTime);
+      const stage = STAGES.find((x) => x.id === st);
+      const b = h("div", { class: "htl-band2", style: `grid-column:${i + 1} / span ${j - i};grid-row:1;background:${stage ? stage.color : "var(--line-2)"};color:${stage && stage.id === "golden" ? "#241a05" : "#fff"}` });
+      b.innerHTML =
+        `<div class="htl-sb-top"><button class="hplay hplay-stage" data-play="stage-${gi}" data-s="${gStart}" data-e="${gEnd}" title="Escuchar toda la etapa">▶</button>` +
+        `<span class="htl-sb-dur">${w}s</span></div><span class="htl-sb-name">${stage ? esc(stage.short) : ""}</span>`;
+      grid.appendChild(b); i = j; gi++;
+    }
+
+    // Filas 2–5 por bloque: Tiempo · UI · Escenario · Acción (todo inline)
+    segs.forEach((s, idx) => {
+      const stage = STAGES.find((x) => x.id === s.narrativeStage);
+      const col = idx + 1;
+      const t = h("div", { class: "htl-cell htl-c-time", style: `grid-column:${col};grid-row:2;--c:${stage ? stage.color : "var(--line-2)"}`, "data-seg": s.id });
+      t.innerHTML = `<span class="htl-b-time">${esc(s.startTime)}</span><small>${esc(s.endTime)} · ${dur(s)}s</small>`;
+      grid.appendChild(t);
+      const cell = (row, cls, k, field, v) => {
+        const c = h("div", { class: "htl-cell " + cls, style: `grid-column:${col};grid-row:${row}`, "data-seg": s.id, "data-field": field });
+        c.innerHTML = `<span class="htl-c-k">${k}<button class="htl-mic" data-seg="${s.id}" data-field="${field}" title="Editar por voz (dictado)">🎤</button></span>` +
+          `<span class="htl-c-v" title="Doble clic para editar">${(v || "").trim() ? esc(v) : "—"}</span>`;
+        return c;
+      };
+      grid.appendChild(cell(3, "htl-c-ui", "UI", "interaction", s.interaction));
+      grid.appendChild(cell(4, "htl-c-esc", "Escenario", "location", s.location));
+      grid.appendChild(cell(5, "htl-c-acc", "Acción", "narrativeAction", s.narrativeAction));
+    });
+
+    scroll.appendChild(grid);
+    wrap.appendChild(scroll);
+    host.appendChild(wrap);
+
+    grid.querySelectorAll(".htl-c-time").forEach((c) => c.addEventListener("click", () => openDrawer(c.getAttribute("data-seg"))));
+    grid.querySelectorAll(".hplay").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      playRange(b.getAttribute("data-play"), +b.getAttribute("data-s"), +b.getAttribute("data-e"));
+    }));
+    grid.querySelectorAll(".htl-mic").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      startVoiceEdit(b.getAttribute("data-seg"), b.getAttribute("data-field"), b);
+    }));
+    grid.querySelectorAll(".htl-c-ui, .htl-c-esc, .htl-c-acc").forEach((c) => c.addEventListener("dblclick", (e) => {
+      if (e.target.closest(".htl-mic")) return;
+      editSlot(c.getAttribute("data-seg"), c.getAttribute("data-field"), c);
+    }));
+    updatePlayButtons();
   }
 
   function renderHero(host) {
@@ -889,6 +953,9 @@
     // Gameplay
     colMain.appendChild(gpField(s));
 
+    // Interacción / UI
+    colMain.appendChild(fgText(s, "interaction", "Interacción / UI (swipe, Fruit Ninja, interfaz en Z, combate…)"));
+
     // Escenario + momento del día (columnas principales)
     const rowCtx = h("div", { class: "fg-row" });
     rowCtx.appendChild(fgInput(s, "location", "Escenario / locación", "Seoul Streets"));
@@ -1006,6 +1073,120 @@
   function fullSongClip() {
     const withVid = data.segments.find((s) => s.storyboard && isVideo(s.storyboard) && (s.clipStart || 0) === parseTime(s.startTime));
     return withVid ? withVid.storyboard : (data.segments.find((s) => s.storyboard && isVideo(s.storyboard)) || {}).storyboard || "";
+  }
+
+  /* ---- Reproducir SÓLO el audio del tramo de un bloque (uno por vez) ---- */
+  // Fuente de audio: la canción real del juego (3:14), ya sincronizada con los timecodes
+  const SONG_AUDIO = "clips/song.m4a";
+  let songAudio = null, playingKey = null, playStop = null;
+  function getSongAudio() {
+    if (!songAudio) {
+      songAudio = document.createElement("audio");
+      songAudio.src = SONG_AUDIO;
+      songAudio.preload = "auto"; songAudio.volume = 1;
+      document.body.appendChild(songAudio);
+    }
+    return songAudio;
+  }
+  function stopSong() {
+    if (songAudio) { try { songAudio.pause(); } catch (e) {} if (playStop) songAudio.removeEventListener("timeupdate", playStop); }
+    playStop = null; playingKey = null; updatePlayButtons();
+  }
+  // Reproduce un rango [start, end] (segundos) de la canción; `key` identifica qué botón suena
+  function playRange(key, start, end) {
+    const a = getSongAudio();
+    if (playingKey === key && !a.paused) { stopSong(); return; } // toggle off
+    stopSong();
+    playingKey = key; updatePlayButtons();
+    const playFrom = () => {
+      playStop = () => { if ((a.currentTime || 0) >= end) stopSong(); };
+      a.addEventListener("timeupdate", playStop);
+      const p = a.play();
+      if (p && p.catch) p.catch(() => { stopSong(); toast("No se pudo reproducir el audio"); });
+    };
+    const seekThenPlay = () => {
+      if (Math.abs((a.currentTime || 0) - start) < 0.25) { playFrom(); return; }
+      a.addEventListener("seeked", function once() { a.removeEventListener("seeked", once); playFrom(); }, { once: true });
+      try { a.currentTime = start; } catch (e) { playFrom(); }
+    };
+    if (a.readyState >= 1) seekThenPlay();
+    else a.addEventListener("loadedmetadata", seekThenPlay, { once: true });
+  }
+  function updatePlayButtons() {
+    document.querySelectorAll(".hplay").forEach((b) => {
+      const on = b.getAttribute("data-play") === playingKey;
+      b.textContent = on ? "⏸" : "▶"; b.classList.toggle("playing", on);
+    });
+  }
+
+  /* ---- Editar el texto de un slot a mano (doble clic) ---- */
+  function editSlot(segId, field, cellEl) {
+    const s = data.segments.find((x) => x.id === segId); if (!s) return;
+    if (cellEl.querySelector(".htl-c-edit")) return;
+    const vEl = cellEl.querySelector(".htl-c-v");
+    const ta = h("textarea", { class: "htl-c-edit" });
+    ta.value = s[field] || "";
+    if (vEl) vEl.style.display = "none";
+    cellEl.appendChild(ta);
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+    let done = false;
+    const finish = (save) => {
+      if (done) return; done = true;
+      if (save) { s[field] = ta.value; persistSegment(s, true); }
+      refreshTimeline();
+    };
+    ta.addEventListener("click", (e) => e.stopPropagation());
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ta.blur(); }
+      else if (e.key === "Escape") { e.preventDefault(); done = true; refreshTimeline(); }
+    });
+    ta.addEventListener("blur", () => finish(true));
+  }
+
+  /* ---- Editar un campo por voz (dictado + comandos, Web Speech API) ---- */
+  let voiceRec = null, voiceBtn = null;
+  function updateVoiceCell(segId, field) {
+    const s = data.segments.find((x) => x.id === segId);
+    const cell = document.querySelector(`.htl-cell[data-seg="${segId}"][data-field="${field}"] .htl-c-v`);
+    if (s && cell) cell.textContent = (s[field] || "").trim() ? s[field] : "—";
+  }
+  function startVoiceEdit(segId, field, btn) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast("Tu navegador no soporta dictado por voz (usá Chrome)"); return; }
+    const wasThis = voiceBtn === btn;
+    if (voiceRec) { try { voiceRec.stop(); } catch (e) {} voiceRec = null; }
+    if (voiceBtn) { voiceBtn.classList.remove("rec"); voiceBtn = null; }
+    if (wasThis) return; // segundo click en el mismo = parar
+    const s = data.segments.find((x) => x.id === segId); if (!s) return;
+    const rec = new SR();
+    rec.lang = "es-ES"; rec.interimResults = true; rec.continuous = true;
+    // arranca del texto actual: así podés AGREGAR, o decir "borrar" para limpiar y dictar de nuevo
+    let base = (s[field] || "").trim();
+    const CLEAR = /^(borr[aá](r|lo|rlo)?|limpi(ar|á|a))( (el )?(texto|todo))?$/i;
+    const norm = (t) => t.trim().replace(/[.,!?;:]+$/g, "").trim();
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let k = e.resultIndex; k < e.results.length; k++) {
+        const t = e.results[k][0].transcript;
+        if (e.results[k].isFinal) {
+          if (CLEAR.test(norm(t))) { base = ""; toast("🧹 Texto borrado — seguí dictando"); }
+          else base = (base ? base + " " : "") + t.trim();
+        } else interim += t;
+      }
+      s[field] = (base + (interim ? (base ? " " : "") + interim : "")).trim();
+      updateVoiceCell(segId, field);
+    };
+    rec.onend = () => {
+      btn.classList.remove("rec"); voiceRec = null; voiceBtn = null;
+      persistSegment(s, true); refreshTimeline();
+    };
+    rec.onerror = (ev) => {
+      btn.classList.remove("rec"); voiceRec = null; voiceBtn = null;
+      if (ev.error !== "no-speech" && ev.error !== "aborted") toast("No se pudo escuchar (" + ev.error + ")");
+    };
+    voiceRec = rec; voiceBtn = btn; btn.classList.add("rec");
+    try { rec.start(); toast('🎤 Dictando… decí "borrar" para limpiar · tocá el mic para terminar'); }
+    catch (e) { btn.classList.remove("rec"); voiceRec = null; voiceBtn = null; }
   }
 
   function openLyricSync() {
